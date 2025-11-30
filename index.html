@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.O.S Viralatas by Andrea | Resgate e Adoção Premium</title>
+    <!-- Carregamento do Tailwind CSS para estilização --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuração da fonte Inter e nova paleta de cores suaves (Rose e Sky) --><style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.4s, color 0.4s;
+        }
+        /* NOVA PALETA DE CORES SUAVES: Rose (Alegria/Fofura) e Sky (Paz/Leveza) */
+        /* Modo Escuro Suave (Base: Gray-800) */
+        .dark body {
+            background-color: #1f2937; 
+            color: #f3f4f6; 
+        }
+        /* Modo Claro Padrão (Base: Gray-50) */
+        .light body {
+            background-color: #f9fafb; 
+            color: #111827; 
+        }
+        /* Estilos base para elementos interativos */
+        .input-style {
+            transition: border-color 0.3s, box-shadow 0.3s;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        .input-style:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.5); /* Rose-400 shadow */
+        }
+        
+        /* Estilo da animação do Easter Egg */
+        .cat-dog-animation {
+            position: absolute;
+            top: 50%;
+            height: 60px; 
+            font-size: 48px; 
+            white-space: nowrap;
+            animation: move-across-reverse 4s linear forwards;
+            transform: translateY(-50%) translateX(100%); 
+        }
+
+        @keyframes move-across-reverse {
+            0% {
+                transform: translateY(-50%) translateX(100vw); 
+            }
+            100% {
+                transform: translateY(-50%) translateX(-100%); 
+            }
+        }
+    </style>
+    <!-- Ícones Lucide para botões e UI --><script type="module" src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Meta tags PWA (Data URI) --><meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💖</text></svg>">
+    
+    <!-- Firebase SDK Imports (módulos) --><script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, setDoc, updateDoc, getDoc, deleteDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        
+        // Configurações e Variáveis Globais (Disponíveis no ambiente Canvas)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        
+        // Inicialização do Firebase
+        let app, db, auth;
+        try {
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            setLogLevel('Debug');
+            console.log("Firebase inicializado.");
+        } catch(e) {
+            console.error("Erro ao inicializar Firebase:", e);
+        }
+
+        let userId = null;
+        let isAdminLoggedIn = false; 
+        
+        // Define um ID fixo para o documento de credenciais
+        const ADMIN_CREDENTIALS_ID = 'credentials_config'; 
+        
+        // --- Caminhos do Firestore ---
+        const ANIMALS_COLLECTION_PATH = `artifacts/${appId}/public/data/animais_resgatados`;
+        const ADOPTION_INTERESTS_PATH = `artifacts/${appId}/public/data/adoption_interests`; // Novo!
+        const ADMIN_CONFIG_DOC_PATH = `artifacts/${appId}/users/${ADMIN_CREDENTIALS_ID}/config/admin_credentials`;
+        const PUBLIC_CONFIG_DOC_PATH = `artifacts/${appId}/public/data/app_config/main_data`;
+        const APP_STATUS_DOC_PATH = `artifacts/${appId}/public/data/app_status/main_status`; // Novo!
+
+        // Estados Locais (Cache)
+        let adminCredentials = { username: 'admin', password: '1234' }; 
+        let appConfig = { email: 'contato@sosviralatas.org', telefone: '(XX) 9XXXX-XXXX', instagram: '@sosviralatas', mapsLink: 'https://maps.app.goo.gl/exemplo' }; 
+        let appStatus = { resgatados_count: 0, adotados_count: 0, aguardando_doacao_count: 0, site_views_count: 0, presentation_text: 'Bem-vindos ao S.O.S Viralatas by Andrea! Nossa missão é dar uma segunda chance a cães e gatos resgatados, encontrando lares amorosos para eles.' }; // Novo!
+        let animalsList = []; // Cache da lista de animais
+        let interestsList = []; // Cache da lista de interessados
+
+        // Elementos da UI
+        const adminSection = document.getElementById('admin-section');
+        const publicSection = document.getElementById('public-section');
+        const loginSection = document.getElementById('login-section');
+        const animalsListPublic = document.getElementById('animals-list-public');
+        const presentationTextElement = document.getElementById('presentation-text'); // Novo!
+        const adminToggleBtn = document.getElementById('toggle-admin');
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const headerElement = document.getElementById('main-header'); 
+        
+        // Estado da Admin View
+        let currentAdminView = 'dashboard'; // 'dashboard', 'animals', 'config'
+
+        // Variável para o Easter Egg
+        let themeToggleClickCount = 0;
+        const EASTER_EGG_LIMIT = 13;
+
+
+        // --- 0. Funções de Configuração Inicial e Credenciais ---
+
+        /** Inicializa e carrega as credenciais e a configuração pública/status. */
+        async function initializeConfigs() {
+            if (!db) return;
+
+            // 1. Credenciais Admin (Privadas) - Apenas tenta ler/escrever
+            try {
+                const adminDocRef = doc(db, ADMIN_CONFIG_DOC_PATH);
+                const adminDocSnap = await getDoc(adminDocRef);
+                if (adminDocSnap.exists()) {
+                    adminCredentials = adminDocSnap.data();
+                } else {
+                    await setDoc(adminDocRef, adminCredentials);
+                }
+            } catch (error) {
+                console.warn("AVISO: Falha ao carregar/inicializar credenciais de Admin. Usando cache local.", error);
+            }
+            
+            // 2. Configuração Pública (Contatos, Mapa) - Apenas tenta ler/escrever
+            try {
+                const publicDocRef = doc(db, PUBLIC_CONFIG_DOC_PATH);
+                const publicDocSnap = await getDoc(publicDocRef);
+                if (publicDocSnap.exists()) {
+                    appConfig = publicDocSnap.data();
+                } else {
+                    await setDoc(publicDocRef, appConfig);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar/inicializar Configuração Pública:", error);
+            }
+            
+            // 3. Status da Aplicação (Contadores, Texto) - Apenas tenta ler/escrever e INCREMENTAR VIEW
+            try {
+                const statusDocRef = doc(db, APP_STATUS_DOC_PATH);
+                const statusDocSnap = await getDoc(statusDocRef);
+                
+                if (statusDocSnap.exists()) {
+                    const data = statusDocSnap.data();
+                    appStatus = data;
+                    
+                    // Incrementa o contador de visitas (Se não for admin)
+                    if (!isAdminLoggedIn) {
+                        const newViews = (data.site_views_count || 0) + 1;
+                        await updateDoc(statusDocRef, { site_views_count: newViews });
+                        appStatus.site_views_count = newViews; // Atualiza cache
+                    }
+                } else {
+                    appStatus.site_views_count = 1; // Primeira visita
+                    await setDoc(statusDocRef, appStatus);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar/incrementar status da Aplicação:", error);
+            }
+        }
+
+        // --- 1. Funções de Layout e Estado ---
+
+        /** Alterna entre modo escuro e claro E gerencia o Easter Egg */
+        themeToggleBtn.addEventListener('click', () => {
+            // 1. Lógica do Tema
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            themeToggleBtn.innerHTML = isDark 
+                ? '<i data-lucide="sun" class="w-6 h-6 text-rose-400"></i>' 
+                : '<i data-lucide="moon" class="w-6 h-6 text-gray-800"></i>';
+            lucide.createIcons();
+
+            // 2. Lógica do Easter Egg
+            themeToggleClickCount++;
+            if (themeToggleClickCount >= EASTER_EGG_LIMIT) {
+                themeToggleClickCount = 0; 
+                triggerEasterEgg();
+            }
+        });
+
+        /** Ativa a animação do gato e do cão */
+        function triggerEasterEgg() {
+            if (!headerElement) return;
+
+            const animationElement = document.createElement('div');
+            animationElement.className = 'cat-dog-animation'; 
+            animationElement.innerHTML = '🐈🐕'; 
+            
+            headerElement.appendChild(animationElement);
+
+            setTimeout(() => {
+                animationElement.remove();
+            }, 4100);
+        }
+
+        /** * Gerencia a visibilidade das seções principais
+         * @param {string} view 'public', 'login', ou 'admin'
+         */
+        function setView(view) {
+            publicSection.classList.add('hidden');
+            loginSection.classList.add('hidden');
+            adminSection.classList.add('hidden');
+
+            adminToggleBtn.classList.remove('bg-rose-400', 'text-gray-800', 'hover:bg-rose-500'); 
+            adminToggleBtn.classList.remove('bg-red-500', 'text-white', 'hover:bg-red-600');
+            
+            if (view === 'public') {
+                publicSection.classList.remove('hidden');
+                adminToggleBtn.innerHTML = '<i data-lucide="settings" class="w-6 h-6"></i>';
+                adminToggleBtn.classList.add('bg-rose-400', 'text-gray-800', 'hover:bg-rose-500'); 
+            } else {
+                adminToggleBtn.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
+                adminToggleBtn.classList.add('bg-red-500', 'text-white', 'hover:bg-red-600');
+
+                if (view === 'login') {
+                    loginSection.classList.remove('hidden');
+                } else if (view === 'admin') {
+                    adminSection.classList.remove('hidden');
+                    // Garante que a dashboard seja a view padrão ao logar
+                    setAdminView(currentAdminView); 
+                    document.getElementById('current-user-id').textContent = userId;
+                }
+            }
+
+            lucide.createIcons();
+        }
+
+        /** * Gerencia a visibilidade dos blocos da área admin
+         * @param {string} view 'dashboard', 'animals', ou 'config'
+         */
+        function setAdminView(view) {
+            currentAdminView = view;
+            const views = {
+                dashboard: document.getElementById('admin-dashboard-block'),
+                animals: document.getElementById('admin-animals-block'),
+                config: document.getElementById('admin-config-block')
+            };
+
+            document.querySelectorAll('#admin-nav button').forEach(btn => {
+                if (btn.dataset.view === view) {
+                    btn.classList.add('bg-sky-500', 'text-white');
+                    btn.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200');
+                } else {
+                    btn.classList.remove('bg-sky-500', 'text-white');
+                    btn.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200');
+                }
+            });
+
+            for (const key in views) {
+                views[key].classList.add('hidden');
+            }
+            views[view].classList.remove('hidden');
+
+            // Ações específicas ao mudar de view
+            if (view === 'config') {
+                populateGlobalConfigForm();
+                populateManagedCountersForm();
+            }
+        }
+
+        // Listener para a navegação Admin
+        document.querySelectorAll('#admin-nav button').forEach(btn => {
+            btn.addEventListener('click', () => setAdminView(btn.dataset.view));
+        });
+
+
+        // --- 2. Autenticação e Configuração Inicial ---
+
+        async function initialAuthAndSetup() {
+            if (!auth || !db) return;
+            
+            // 1. Tenta autenticar
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                 console.error("Erro durante a autenticação inicial:", error);
+            }
+
+            // 2. Espera pelo estado de autenticação e configura o listener principal
+            onAuthStateChanged(auth, async (user) => {
+                userId = user ? user.uid : null;
+                
+                // 3. Garante que todas as configurações (Admin, Públicas, Status) sejam carregadas E view incrementada
+                await initializeConfigs();
+
+                // 4. Configura os listeners do Firestore APÓS a autenticação
+                setupAnimalsListener();
+                setupAppStatusListener(); // Novo listener
+                setupAdoptionInterestsListener(); // Novo listener
+                renderPublicConfig(); 
+                
+                // Define a view inicial
+                if (isAdminLoggedIn) {
+                    setView('admin');
+                } else {
+                    setView('public');
+                }
+            });
+        }
+        
+        // --- 2.1 Login Admin e Logout ---
+        document.getElementById('admin-login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const usernameInput = e.target.username.value;
+            const passwordInput = e.target.password.value;
+            const loginErrorMessage = document.getElementById('login-error-message');
+            
+            loginErrorMessage.textContent = '';
+            
+            await initializeConfigs(); // Recarrega as credenciais mais recentes
+
+            if (usernameInput !== adminCredentials.username || passwordInput !== adminCredentials.password) {
+                 loginErrorMessage.textContent = 'Credenciais incorretas.';
+                 return;
+            }
+
+            isAdminLoggedIn = true; 
+            showModal("Bem-vindo, Andrea!", "Login de administração realizado com sucesso.");
+            setView('admin'); 
+        });
+
+        document.getElementById('logout-admin').addEventListener('click', async () => {
+            isAdminLoggedIn = false; 
+            showModal("Sessão Encerrada", "Você saiu da área administrativa.");
+            setView('public'); 
+        });
+
+
+        // --- 3. Listener do Status da Aplicação (Contadores e Texto de Apresentação) ---
+
+        function setupAppStatusListener() {
+            if (!db) return;
+            try {
+                const statusDocRef = doc(db, APP_STATUS_DOC_PATH);
+                onSnapshot(statusDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        appStatus = docSnap.data();
+                    } else {
+                        // Se o documento não existir, usa o status inicial
+                        appStatus = { resgatados_count: 0, adotados_count: 0, aguardando_doacao_count: 0, site_views_count: 0, presentation_text: 'Bem-vindos...' };
+                    }
+                    renderPublicStatus(); // Atualiza a apresentação pública e contadores
+                    renderAdminIndicators(); // Atualiza contadores no topo do Admin
+                }, (error) => {
+                    console.error("Erro ao buscar status da aplicação:", error);
+                });
+            } catch(e) {
+                console.error("Erro ao configurar onSnapshot para App Status:", e);
+            }
+        }
+
+        /** Renderiza o texto de apresentação e os contadores na página pública. */
+        function renderPublicStatus() {
+            // Renderiza o texto de apresentação
+            presentationTextElement.textContent = appStatus.presentation_text;
+
+            // Renderiza os contadores públicos
+            document.getElementById('resgatados-count').textContent = appStatus.resgatados_count || 0;
+            document.getElementById('adotados-count').textContent = appStatus.adotados_count || 0;
+            document.getElementById('doacao-count').textContent = appStatus.aguardando_doacao_count || 0;
+        }
+
+        /** Renderiza os indicadores no topo do Painel Admin. */
+        function renderAdminIndicators() {
+            document.getElementById('admin-views-count').textContent = appStatus.site_views_count || 0;
+            document.getElementById('admin-available-animals').textContent = animalsList.length; // Usa o cache da lista de animais
+        }
+
+
+        // --- 4. Gerenciamento dos Contadores na Admin Config ---
+
+        /** Popula o formulário de contadores gerenciados com dados atuais */
+        function populateManagedCountersForm() {
+            const form = document.getElementById('managed-counters-form');
+            if (form) {
+                form.querySelector('#resgatados').value = appStatus.resgatados_count || 0;
+                form.querySelector('#adotados').value = appStatus.adotados_count || 0;
+                form.querySelector('#aguardando').value = appStatus.aguardando_doacao_count || 0;
+            }
+        }
+
+        document.getElementById('managed-counters-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+             if (!isAdminLoggedIn || !db) { showModal("Acesso Negado", "Admin necessário."); return; }
+
+            const newCounts = {
+                resgatados_count: parseInt(e.target.resgatados.value) || 0,
+                adotados_count: parseInt(e.target.adotados.value) || 0,
+                aguardando_doacao_count: parseInt(e.target.aguardando.value) || 0
+            };
+
+            try {
+                const statusDocRef = doc(db, APP_STATUS_DOC_PATH);
+                await updateDoc(statusDocRef, newCounts);
+                showModal("Sucesso", "Contadores de Resgate/Adoção atualizados!");
+            } catch (error) {
+                console.error("Erro ao salvar contadores:", error);
+                showModal("Erro", `Não foi possível salvar os contadores. Detalhes: ${error.message}.`);
+            }
+        });
+
+
+        // --- 5. Gerenciamento do Formulário de Interesse em Adoção ---
+
+        const adoptionInterestForm = document.getElementById('adoption-interest-form');
+
+        /** Abre o modal de interesse em adoção. */
+        function openAdoptionModal(animalId, animalName) {
+            document.getElementById('interest-animal-name').textContent = animalName;
+            adoptionInterestForm.dataset.animalId = animalId;
+            adoptionInterestForm.dataset.animalName = animalName;
+            document.getElementById('adoption-modal').classList.remove('hidden');
+            document.getElementById('adoption-interest-error').textContent = '';
+        }
+
+        /** Fecha o modal de interesse. */
+        document.getElementById('adoption-modal-close').addEventListener('click', () => {
+            document.getElementById('adoption-modal').classList.add('hidden');
+            adoptionInterestForm.reset();
+        });
+
+        adoptionInterestForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const animalId = adoptionInterestForm.dataset.animalId;
+            const animalName = adoptionInterestForm.dataset.animalName;
+            
+            const data = {
+                nome: e.target.interestName.value.trim(),
+                telefone: e.target.interestPhone.value.trim(),
+                email: e.target.interestEmail.value.trim() || 'Não fornecido',
+                dataSubmissao: Date.now(),
+                animalId: animalId,
+                animalNome: animalName
+            };
+            
+            const errorElement = document.getElementById('adoption-interest-error');
+            errorElement.textContent = '';
+
+            if (!data.nome || !data.telefone) {
+                errorElement.textContent = 'Nome e Telefone são campos obrigatórios.';
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, ADOPTION_INTERESTS_PATH), data);
+                showModal("Obrigado!", `Seu interesse em ${animalName} foi registrado! Entraremos em contato em breve.`);
+                document.getElementById('adoption-modal').classList.add('hidden');
+                adoptionInterestForm.reset();
+            } catch (error) {
+                console.error("Erro ao registrar interesse:", error);
+                showModal("Erro", `Não foi possível registrar seu interesse. Tente novamente mais tarde.`);
+            }
+        });
+
+        // --- 6. Listener para a Lista de Interessados em Adoção ---
+
+        function setupAdoptionInterestsListener() {
+            if (!db) return;
+            try {
+                const interestsCollectionRef = collection(db, ADOPTION_INTERESTS_PATH);
+                const q = query(interestsCollectionRef, orderBy('dataSubmissao', 'desc'));
+                
+                onSnapshot(q, (snapshot) => {
+                    interestsList = [];
+                    snapshot.forEach(doc => {
+                        interestsList.push({ id: doc.id, ...doc.data() });
+                    });
+                    renderInterestsListAdmin(interestsList);
+                }, (error) => {
+                    console.error("Erro ao buscar lista de interessados:", error);
+                });
+            } catch(e) {
+                console.error("Erro ao configurar onSnapshot para Interessados:", e);
+            }
+        }
+
+        /** Renderiza a lista de interessados na Dashboard Admin. */
+        function renderInterestsListAdmin(list) {
+            const container = document.getElementById('adoption-interests-list');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 p-4">Nenhum interessado registrado ainda. 💖</p>';
+                document.getElementById('interests-count').textContent = 0;
+                return;
+            }
+            
+            document.getElementById('interests-count').textContent = list.length;
+            
+            list.forEach(item => {
+                const itemDate = new Date(item.dataSubmissao).toLocaleDateString('pt-BR');
+                const listItem = document.createElement('li');
+                listItem.className = 'bg-white dark:bg-gray-700 p-4 rounded-lg shadow border border-sky-100 dark:border-sky-800 flex justify-between items-center mb-2';
+                listItem.innerHTML = `
+                    <div>
+                        <p class="font-bold text-lg text-rose-500">${item.nome} (${itemDate})</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Animal: <span class="font-semibold">${item.animalNome}</span></p>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">📞 ${item.telefone}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">📧 ${item.email}</p>
+                    </div>
+                    <button data-id="${item.id}" data-action="delete-interest" class="delete-interest-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-colors flex items-center space-x-1 shadow-md">
+                        <i data-lucide="check" class="w-4 h-4"></i>
+                    </button>
+                `;
+                container.appendChild(listItem);
+            });
+            lucide.createIcons();
+        }
+        
+        // Listener para deletar interesse (marcar como lido)
+        document.getElementById('adoption-interests-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.delete-interest-btn');
+            if (btn) {
+                const id = btn.dataset.id;
+                const listItem = btn.closest('li');
+
+                const isConfirmed = await showConfirmModal("Marcar como Tratado", "Marcar este interesse como tratado e remover da lista?");
+                
+                if (!isConfirmed) return;
+
+                try {
+                    const interestRef = doc(db, ADOPTION_INTERESTS_PATH, id);
+                    await deleteDoc(interestRef);
+                    showModal("Sucesso", "Interesse removido da lista.");
+                } catch (error) {
+                    console.error("Erro ao deletar interesse:", error);
+                    showModal("Erro", `Não foi possível remover. Detalhes: ${error.message}.`);
+                }
+            }
+        });
+
+
+        // --- 7. CRUD de Animais (Atualização de Cores e Cache) ---
+
+        /** Configura o listener em tempo real para a coleção de animais (Public). */
+        function setupAnimalsListener() {
+            if (!db) return;
+            try {
+                const animalsCollectionRef = collection(db, ANIMALS_COLLECTION_PATH);
+                onSnapshot(animalsCollectionRef, (snapshot) => {
+                    animalsList = [];
+                    snapshot.forEach(doc => {
+                        animalsList.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    animalsList.sort((a, b) => (b.dataCriacao || 0) - (a.dataCriacao || 0));
+
+                    renderAnimals(animalsList, isAdminLoggedIn); 
+                    renderAdminIndicators(); // Atualiza contagem de animais no topo admin
+                }, (error) => {
+                    console.error("Erro ao buscar dados do Firestore:", error);
+                     animalsListPublic.innerHTML = '<p class="text-center text-red-500 p-4">Erro ao carregar dados. Verifique as permissões de leitura no Firestore.</p>';
+                });
+            } catch(e) {
+                console.error("Erro ao tentar configurar onSnapshot:", e);
+            }
+        }
+        
+        /** Renderiza as listas de animais na área pública e administrativa. */
+        function renderAnimals(animals, isAdminView) {
+            document.getElementById('animals-list-admin').innerHTML = '';
+            animalsListPublic.innerHTML = '';
+
+            if (animals.length === 0) {
+                animalsListPublic.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 p-4">Nenhum animal resgatado cadastrado ainda. 🐾</p>';
+                document.getElementById('animals-list-admin').innerHTML = '<li class="text-gray-500 dark:text-gray-400 p-4">A lista está vazia. Adicione um novo animal acima!</li>';
+                return;
+            }
+
+            // Renderiza na Área Pública (Landing Page)
+            animals.slice(0, 6).forEach(animal => { // Mostra apenas os 6 mais recentes
+                const card = createAnimalCard(animal, false);
+                animalsListPublic.appendChild(card);
+            });
+
+            // Renderiza na Área Administrativa (Se logado)
+            if (isAdminView) {
+                animals.forEach(animal => {
+                    const listItem = createAnimalCard(animal, true);
+                    document.getElementById('animals-list-admin').appendChild(listItem);
+                });
+            }
+        }
+
+        /** Cria o card/item de animal. */
+        function createAnimalCard(animal, isAdmin) {
+            const container = document.createElement(isAdmin ? 'li' : 'div');
+            container.className = isAdmin 
+                ? 'bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-4 mb-4 transition-colors border border-gray-200 dark:border-gray-700' 
+                : 'bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden transform hover:scale-[1.02] transition-all duration-300 border border-rose-100 dark:border-rose-900';
+            
+            // Placeholder usa a nova cor Rose
+            const imageUrl = animal.imagemUrl && animal.imagemUrl.startsWith('http') 
+                ? animal.imagemUrl 
+                : `https://placehold.co/400x300/F472B6/FFFFFF?text=🐾+${animal.nome}`; /* Pink/Rose */
+
+            if (isAdmin) {
+                container.innerHTML = `
+                    <img src="${imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/64x64/F472B6/FFFFFF?text=🐾';" alt="Foto de ${animal.nome}" class="w-16 h-16 object-cover rounded-full flex-shrink-0 border-2 border-rose-400">
+                    <div class="flex-grow min-w-0">
+                        <h3 class="text-xl font-bold text-sky-600 dark:text-sky-400 truncate">${animal.nome}</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">${animal.raca} - ${animal.idade} ano(s)</p>
+                    </div>
+                    <div class="flex space-x-2 mt-3 md:mt-0 flex-shrink-0">
+                        <button data-id="${animal.id}" data-action="edit" class="edit-btn bg-sky-400 hover:bg-sky-500 text-gray-800 p-2 rounded-lg text-sm transition-colors flex items-center space-x-1 shadow-md">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <button data-id="${animal.id}" data-action="delete" class="delete-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg text-sm transition-colors flex items-center space-x-1 shadow-md">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+                container.querySelector('.edit-btn').addEventListener('click', () => editAnimal(animal));
+                container.querySelector('.delete-btn').addEventListener('click', () => deleteAnimal(animal.id, animal.nome));
+            } else {
+                container.innerHTML = `
+                    <img src="${imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/400x300/F472B6/FFFFFF?text=S.O.S+Viralatas';" alt="Foto de ${animal.nome}" class="w-full h-48 object-cover">
+                    <div class="p-5">
+                        <h3 class="text-2xl font-extrabold text-sky-600 dark:text-sky-400 mb-1">${animal.nome}</h3>
+                        <p class="text-base text-gray-700 dark:text-gray-300 font-medium">${animal.raca} | ${animal.idade} ano(s)</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-3 line-clamp-3">${animal.descricao}</p>
+                        <button data-id="${animal.id}" data-name="${animal.nome}" class="adoption-interest-btn mt-5 w-full bg-rose-400 text-gray-800 py-3 rounded-xl hover:bg-rose-500 transition-colors font-bold shadow-xl flex items-center justify-center space-x-2">
+                             <i data-lucide="heart" class="w-5 h-5"></i><span>Quero Adotar!</span>
+                        </button>
+                    </div>
+                `;
+                 // Adiciona listener para abrir o modal de interesse
+                container.querySelector('.adoption-interest-btn').addEventListener('click', (e) => {
+                    openAdoptionModal(e.currentTarget.dataset.id, e.currentTarget.dataset.name);
+                });
+            }
+
+            lucide.createIcons();
+            
+            return container;
+        }
+        
+        // 7.1 Adicionar/Atualizar Animal
+        document.getElementById('animal-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!isAdminLoggedIn || !db) { showModal("Acesso Negado", "Admin necessário."); return; }
+
+            const animalForm = document.getElementById('animal-form');
+            const formData = new FormData(animalForm);
+            const data = Object.fromEntries(formData.entries());
+            data.dataCriacao = Date.now(); 
+            data.idade = parseInt(data.idade);
+
+            const animalId = animalForm.dataset.editingId;
+
+            if (!data.nome || data.idade <= 0 || !data.descricao) {
+                 showModal("Erro de Validação", "Por favor, preencha o Nome, Idade e Descrição corretamente.");
+                return;
+            }
+
+            try {
+                if (animalId) {
+                    const animalRef = doc(db, ANIMALS_COLLECTION_PATH, animalId);
+                    await updateDoc(animalRef, data);
+                    showModal("Sucesso", `Animal ${data.nome} atualizado com sucesso!`);
+                    delete animalForm.dataset.editingId; 
+                    document.getElementById('animal-form-submit-btn').textContent = 'Adicionar Animal';
+                    document.getElementById('animal-form-submit-btn').classList.remove('bg-rose-400');
+                    document.getElementById('animal-form-submit-btn').classList.add('bg-sky-500'); 
+                } else {
+                    await addDoc(collection(db, ANIMALS_COLLECTION_PATH), data);
+                    showModal("Sucesso", `Animal ${data.nome} adicionado aos resgatados!`);
+                }
+                
+                animalForm.reset();
+            } catch (error) {
+                console.error("Erro ao salvar animal:", error);
+                 showModal("Erro", `Não foi possível salvar os dados. Detalhes: ${error.message}.`);
+            }
+        });
+        
+        // 7.2 Editar Animal (Popula o formulário)
+        function editAnimal(animal) {
+            document.getElementById('nome').value = animal.nome || '';
+            document.getElementById('raca').value = animal.raca || '';
+            document.getElementById('idade').value = animal.idade || '';
+            document.getElementById('imagemUrl').value = animal.imagemUrl || '';
+            document.getElementById('descricao').value = animal.descricao || '';
+            
+            const animalForm = document.getElementById('animal-form');
+            animalForm.dataset.editingId = animal.id;
+            
+            document.getElementById('animal-form-submit-btn').textContent = 'Salvar Edição';
+            document.getElementById('animal-form-submit-btn').classList.remove('bg-sky-500');
+            document.getElementById('animal-form-submit-btn').classList.add('bg-rose-400'); 
+            
+            setAdminView('animals'); // Volta para a seção de animais
+            document.getElementById('admin-animals-block').scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        
+        // 7.3 Deletar Animal
+        async function deleteAnimal(id, nome) {
+            if (!isAdminLoggedIn || !db) { showModal("Acesso Negado", "Admin necessário."); return; }
+            
+            const isConfirmed = await showConfirmModal(`Excluir ${nome}`, `Tem certeza que deseja remover ${nome} da lista de resgatados? Esta ação é irreversível.`);
+            
+            if (!isConfirmed) return;
+
+            try {
+                const animalRef = doc(db, ANIMALS_COLLECTION_PATH, id);
+                await deleteDoc(animalRef);
+                showModal("Sucesso", `${nome} foi removido com sucesso.`);
+            } catch (error) {
+                console.error("Erro ao deletar animal:", error);
+                showModal("Erro", `Não foi possível deletar ${nome}. Detalhes: ${error.message}.`);
+            }
+        }
+
+        // --- 8. Renderização da Configuração Pública (Rodapé/Brechó) ---
+        function renderPublicConfig() {
+            const footer = document.getElementById('main-footer');
+            const brechoSection = document.getElementById('brecho-section');
+            
+            // --- 1. Rodapé (Contato) ---
+            footer.innerHTML = `
+                <div class="max-w-7xl mx-auto p-8 grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
+                    <div>
+                        <h4 class="text-xl font-bold mb-3 text-rose-400">Contato</h4>
+                        <p class="mb-1 flex items-center justify-center md:justify-start space-x-2"><i data-lucide="mail" class="w-5 h-5"></i><span>${appConfig.email || 'N/A'}</span></p>
+                        <p class="mb-1 flex items-center justify-center md:justify-start space-x-2"><i data-lucide="phone" class="w-5 h-5"></i><span>${appConfig.telefone || 'N/A'}</span></p>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold mb-3 text-rose-400">Siga-nos</h4>
+                        <a href="https://instagram.com/${appConfig.instagram.replace('@', '')}" target="_blank" class="text-white hover:text-rose-400 transition-colors flex items-center justify-center md:justify-start space-x-2">
+                             <i data-lucide="instagram" class="w-5 h-5"></i><span>${appConfig.instagram || 'N/A'}</span>
+                        </a>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-bold mb-3 text-rose-400">Apoie a Causa</h4>
+                        <p>Sua doação faz a diferença na vida de cada animal resgatado.</p>
+                    </div>
+                </div>
+                <div class="text-center border-t border-sky-700 pt-4 mt-4">
+                    <p class="text-sm opacity-75">&copy; 2024 S.O.S Viralatas by Andrea. Todos os direitos reservados.</p>
+                </div>
+            `;
+            
+            // --- 2. Brechó (Mapa) ---
+            if (appConfig.mapsLink && appConfig.mapsLink.startsWith('http')) {
+                brechoSection.classList.remove('hidden');
+                brechoSection.querySelector('#maps-link-btn').href = appConfig.mapsLink;
+            } else {
+                brechoSection.classList.add('hidden');
+            }
+
+            lucide.createIcons();
+        }
+
+
+        // --- 9. Configurações Globais (Senha + Contato/Mapa + Texto) ---
+
+        /** Popula o formulário de config pública com dados atuais */
+        function populateGlobalConfigForm() {
+            const form = document.getElementById('global-config-form');
+            if (form) {
+                form.querySelector('#email').value = appConfig.email || '';
+                form.querySelector('#telefone').value = appConfig.telefone || '';
+                form.querySelector('#instagram').value = appConfig.instagram || '';
+                form.querySelector('#mapsLink').value = appConfig.mapsLink || '';
+                form.querySelector('#presentationText').value = appStatus.presentation_text || ''; // Novo!
+                
+                // Limpa campos de senha
+                form.querySelector('#oldPassword').value = '';
+                form.querySelector('#newPassword').value = '';
+                form.querySelector('#confirmNewPassword').value = '';
+                document.getElementById('config-error-message').textContent = '';
+            }
+        }
+        
+        document.getElementById('global-config-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!isAdminLoggedIn || !db) { showModal("Acesso Negado", "Admin necessário."); return; }
+
+            const oldPassword = e.target.oldPassword.value;
+            const newPassword = e.target.newPassword.value;
+            const confirmNewPassword = e.target.confirmNewPassword.value;
+            const configErrorMessage = document.getElementById('config-error-message');
+            configErrorMessage.textContent = '';
+            
+            const newConfig = {
+                email: e.target.email.value,
+                telefone: e.target.telefone.value,
+                instagram: e.target.instagram.value,
+                mapsLink: e.target.mapsLink.value
+            };
+
+            const newStatusText = {
+                presentation_text: e.target.presentationText.value
+            };
+
+            let passwordUpdated = false;
+            let configUpdated = false;
+            let statusTextUpdated = false;
+
+            // --- A. Tenta atualizar a Senha ---
+            if (oldPassword || newPassword || confirmNewPassword) {
+                if (oldPassword !== adminCredentials.password) { configErrorMessage.textContent = 'Senha atual incorreta.'; return; }
+                if (newPassword.length < 4) { configErrorMessage.textContent = 'A nova senha deve ter pelo menos 4 caracteres.'; return; }
+                if (newPassword !== confirmNewPassword) { configErrorMessage.textContent = 'A nova senha e a confirmação não coincidem.'; return; }
+                
+                try {
+                    const adminDocRef = doc(db, ADMIN_CONFIG_DOC_PATH);
+                    const updatedCredentials = { ...adminCredentials, password: newPassword };
+                    await setDoc(adminDocRef, updatedCredentials); 
+                    adminCredentials = updatedCredentials; 
+                    passwordUpdated = true;
+                } catch (error) {
+                    console.error("Erro ao tentar trocar a senha no Firestore. O cache foi atualizado.", error);
+                    showModal("Aviso", "A senha foi atualizada localmente, mas não pôde ser salva no Firestore devido a regras de segurança (caminho fixo privado).");
+                }
+            }
+
+            // --- B. Tenta atualizar a Configuração Pública (Contatos/Mapa) ---
+            try {
+                const publicDocRef = doc(db, PUBLIC_CONFIG_DOC_PATH);
+                await setDoc(publicDocRef, newConfig); 
+                appConfig = newConfig; 
+                configUpdated = true;
+                renderPublicConfig(); 
+            } catch (error) {
+                console.error("Erro ao salvar Configuração Pública:", error);
+                configErrorMessage.textContent = `Erro ao salvar configurações públicas: ${error.message}`;
+                return;
+            }
+            
+            // --- C. Tenta atualizar o Texto de Apresentação (App Status) ---
+             try {
+                const statusDocRef = doc(db, APP_STATUS_DOC_PATH);
+                await updateDoc(statusDocRef, newStatusText); 
+                appStatus = {...appStatus, ...newStatusText}; 
+                statusTextUpdated = true;
+                renderPublicStatus(); 
+            } catch (error) {
+                console.error("Erro ao salvar Texto de Apresentação:", error);
+                configErrorMessage.textContent = `Erro ao salvar texto de apresentação: ${error.message}`;
+                return;
+            }
+
+            const message = [
+                passwordUpdated && "Senha",
+                configUpdated && "Configurações Públicas",
+                statusTextUpdated && "Texto de Apresentação"
+            ].filter(Boolean).join(', ');
+
+            if (message) {
+                showModal("Sucesso", `${message} atualizado(s) com sucesso!`);
+            } else {
+                 showModal("Aviso", "Nenhuma alteração detectada.");
+            }
+            // Limpa campos de senha
+            e.target.oldPassword.value = '';
+            e.target.newPassword.value = '';
+            e.target.confirmNewPassword.value = '';
+        });
+
+
+        // --- 10. Modal Customizado (Substitui alert/confirm) ---
+
+        const customModal = document.getElementById('custom-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalPrimaryBtn = document.getElementById('modal-primary-btn');
+        const modalSecondaryBtn = document.getElementById('modal-secondary-btn');
+
+        /** Exibe um modal simples de alerta. */
+        function showModal(title, message) {
+            return new Promise(resolve => {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                modalPrimaryBtn.textContent = 'Fechar';
+                modalPrimaryBtn.classList.remove('bg-red-500');
+                modalPrimaryBtn.classList.add('bg-sky-500', 'hover:bg-sky-600');
+                modalSecondaryBtn.classList.add('hidden'); 
+                
+                const closeHandler = () => {
+                    customModal.classList.add('hidden');
+                    modalPrimaryBtn.removeEventListener('click', closeHandler);
+                    resolve(true); 
+                };
+
+                modalPrimaryBtn.addEventListener('click', closeHandler);
+                customModal.classList.remove('hidden');
+            });
+        }
+
+        /** Exibe um modal de confirmação (sim/não). */
+        function showConfirmModal(title, message) {
+            return new Promise(resolve => {
+                modalTitle.textContent = title;
+                modalMessage.textContent = message;
+                
+                // Configuração para Confirmação
+                modalPrimaryBtn.textContent = 'Sim, Continuar';
+                modalPrimaryBtn.classList.add('bg-red-500', 'hover:bg-red-600');
+                modalPrimaryBtn.classList.remove('bg-sky-500');
+                modalSecondaryBtn.textContent = 'Cancelar';
+                modalSecondaryBtn.classList.remove('hidden');
+                modalSecondaryBtn.classList.remove('bg-red-500'); 
+                modalSecondaryBtn.classList.add('bg-gray-300', 'text-gray-800', 'hover:bg-gray-400');
+
+                const yesHandler = () => {
+                    customModal.classList.add('hidden');
+                    modalPrimaryBtn.removeEventListener('click', yesHandler);
+                    modalSecondaryBtn.removeEventListener('click', noHandler);
+                    resolve(true);
+                };
+
+                const noHandler = () => {
+                    customModal.classList.add('hidden');
+                    modalPrimaryBtn.removeEventListener('click', yesHandler);
+                    modalSecondaryBtn.removeEventListener('click', noHandler);
+                    resolve(false);
+                };
+
+                modalPrimaryBtn.addEventListener('click', yesHandler);
+                modalSecondaryBtn.addEventListener('click', noHandler);
+                customModal.classList.remove('hidden');
+            });
+        }
+        
+        // --- 11. Inicialização do App ---
+        initialAuthAndSetup(); 
+    </script>
+</head>
+<body class="min-h-screen">
+
+    <!-- Modal de Interesse em Adoção -->
+    <div id="adoption-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-75 transition-opacity duration-300">
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-6 m-4 max-w-lg w-full transform transition-all duration-300 scale-100">
+                <div class="flex justify-between items-center mb-4 border-b pb-2 border-rose-200 dark:border-rose-900">
+                    <h3 class="text-2xl font-bold text-rose-500">Quero Adotar!</h3>
+                    <button id="adoption-modal-close" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                <p class="mb-4 text-gray-700 dark:text-gray-300">Deixe seus dados para que possamos iniciar o processo de adoção de <span id="interest-animal-name" class="font-bold text-sky-600"></span>.</p>
+                <form id="adoption-interest-form" class="space-y-4">
+                    <div>
+                        <label for="interestName" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome Completo <span class="text-red-500">*</span></label>
+                        <input type="text" id="interestName" name="interestName" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                    </div>
+                    <div>
+                        <label for="interestPhone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefone/WhatsApp <span class="text-red-500">*</span></label>
+                        <input type="tel" id="interestPhone" name="interestPhone" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                    </div>
+                    <div>
+                        <label for="interestEmail" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email (Opcional)</label>
+                        <input type="email" id="interestEmail" name="interestEmail" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                    </div>
+                    <p id="adoption-interest-error" class="text-red-500 text-sm h-4"></p>
+                    <button type="submit" class="w-full py-3 bg-rose-400 text-gray-800 rounded-xl hover:bg-rose-500 transition-colors font-bold shadow-lg">
+                        Enviar Interesse
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Customizado (Alerta/Confirmação) -->
+    <div id="custom-modal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-gray-900 bg-opacity-75 transition-opacity duration-300">
+        <div class="flex items-center justify-center min-h-screen">
+            <div class="bg-white dark:bg-gray-700 rounded-xl shadow-2xl p-6 m-4 max-w-sm w-full transform transition-all duration-300 scale-100">
+                <h3 id="modal-title" class="text-xl font-bold mb-4 text-sky-600 dark:text-sky-400">Título</h3>
+                <p id="modal-message" class="text-gray-700 dark:text-gray-300 mb-6">Mensagem</p>
+                <div class="flex justify-end space-x-3">
+                    <button id="modal-secondary-btn" class="hidden px-4 py-2 rounded-lg transition-colors font-medium"></button>
+                    <button id="modal-primary-btn" class="px-4 py-2 text-white rounded-lg transition-colors font-medium"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navegação e Cabeçalho Principal (headerElement) -->
+    <header id="main-header" class="bg-white dark:bg-gray-800 shadow-xl sticky top-0 z-40 relative">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <span class="text-3xl">💖</span>
+                <h1 class="text-2xl font-extrabold text-rose-500 dark:text-rose-400">S.O.S Viralatas <span class="text-sky-600 dark:text-sky-400 font-medium">by Andrea</span></h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <!-- Botão de Alternância de Tema -->
+                <button id="theme-toggle" class="p-2 rounded-full transition-colors hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <i data-lucide="moon" class="w-6 h-6 text-gray-800"></i>
+                </button>
+                
+                <!-- Botão de Alternância Admin/Público -->
+                <button id="toggle-admin" class="p-2 rounded-full shadow-md transition-colors bg-rose-400 text-gray-800 hover:bg-rose-500">
+                     <i data-lucide="settings" class="w-6 h-6"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        
+        <!-- === 1. SEÇÃO PÚBLICA (Landing Page) === -->
+        <section id="public-section" class="space-y-12">
+
+            <!-- Texto de Apresentação (Novo!) -->
+             <div class="bg-sky-100 dark:bg-sky-900 p-6 rounded-2xl shadow-xl border border-sky-300 dark:border-sky-700 text-center">
+                <h2 class="text-3xl font-extrabold mb-3 text-sky-700 dark:text-sky-300">Nossa Missão Fofa 🐾</h2>
+                <p id="presentation-text" class="text-lg text-gray-700 dark:text-gray-200">
+                    <!-- O texto será injetado por renderPublicStatus() -->
+                </p>
+            </div>
+
+            <!-- Contadores (Visão Pública) -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-b-4 border-rose-400">
+                    <i data-lucide="dog" class="w-8 h-8 mx-auto mb-2 text-rose-500"></i>
+                    <p class="text-4xl font-extrabold text-rose-500" id="resgatados-count">0</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Resgatados</p>
+                </div>
+                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-b-4 border-sky-400">
+                    <i data-lucide="home" class="w-8 h-8 mx-auto mb-2 text-sky-500"></i>
+                    <p class="text-4xl font-extrabold text-sky-500" id="adotados-count">0</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Adotados</p>
+                </div>
+                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border-b-4 border-rose-200">
+                    <i data-lucide="syringe" class="w-8 h-8 mx-auto mb-2 text-rose-300"></i>
+                    <p class="text-4xl font-extrabold text-rose-300" id="doacao-count">0</p>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Aguardando Doação</p>
+                </div>
+            </div>
+
+            <!-- Lista de Animais (Público) -->
+            <div class="space-y-8">
+                <h2 class="text-3xl font-bold text-gray-900 dark:text-gray-100 border-b-2 border-rose-400 pb-2">Nossos Fofinhos Disponíveis para Adoção</h2>
+                <div id="animals-list-public" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <!-- Cards de Animais serão injetados aqui -->
+                </div>
+            </div>
+
+            <!-- Seção do Brechó/Localização -->
+            <div id="brecho-section" class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 hidden">
+                <h3 class="text-3xl font-bold text-sky-600 dark:text-sky-400 mb-4">Nosso Brechó Solidário</h3>
+                <p class="text-lg mb-6 text-gray-700 dark:text-gray-300">Visite nosso brechó para apoiar a causa! Toda a renda é revertida para o tratamento e alimentação dos animais resgatados.</p>
+                <a id="maps-link-btn" href="#" target="_blank" class="inline-flex items-center justify-center px-6 py-3 bg-rose-400 text-gray-800 font-bold rounded-xl hover:bg-rose-500 transition-colors shadow-lg space-x-2">
+                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                    <span>Ver Localização no Mapa</span>
+                </a>
+            </div>
+
+        </section>
+
+
+        <!-- === 2. SEÇÃO DE LOGIN ADMINISTRATIVO === -->
+        <section id="login-section" class="hidden">
+            <div class="max-w-md mx-auto bg-white dark:bg-gray-800 p-8 rounded-xl shadow-2xl border-t-4 border-sky-600 dark:border-sky-400">
+                <h2 class="text-3xl font-bold mb-6 text-sky-600 dark:text-sky-400 text-center">Acesso Administrativo</h2>
+                <form id="admin-login-form" class="space-y-4">
+                    <div>
+                        <label for="username" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Usuário</label>
+                        <input type="text" id="username" name="username" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                    </div>
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha</label>
+                        <input type="password" id="password" name="password" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                    </div>
+                    <p id="login-error-message" class="text-red-500 text-sm h-4"></p>
+                    <button type="submit" class="w-full py-3 bg-sky-500 text-white rounded-xl hover:bg-sky-600 transition-colors font-bold shadow-md mt-4">Entrar</button>
+                </form>
+                <p class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">Usuário Padrão: admin | Senha Padrão: 1234</p>
+            </div>
+        </section>
+
+        <!-- === 3. SEÇÃO ADMINISTRATIVA (Painel Organizado) === -->
+        <section id="admin-section" class="hidden space-y-8">
+            <div class="flex flex-col sm:flex-row justify-between items-center bg-sky-500 text-white p-4 rounded-xl shadow-xl">
+                <h2 class="text-3xl font-extrabold">Painel de Administração</h2>
+                <button id="logout-admin" class="px-4 py-2 mt-3 sm:mt-0 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium flex items-center space-x-2 shadow-md">
+                    <i data-lucide="log-out" class="w-5 h-5"></i>
+                    <span>Sair</span>
+                </button>
+            </div>
+
+            <!-- Indicadores Topo Admin -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                 <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border-l-4 border-sky-400">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Visitas do Site</p>
+                    <p class="text-2xl font-bold text-sky-600 dark:text-sky-400" id="admin-views-count">0</p>
+                </div>
+                 <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border-l-4 border-rose-400">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Animais Disponíveis</p>
+                    <p class="text-2xl font-bold text-rose-600 dark:text-rose-400" id="admin-available-animals">0</p>
+                </div>
+                 <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border-l-4 border-rose-200">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Interesses Pendentes</p>
+                    <p class="text-2xl font-bold text-rose-300" id="interests-count">0</p>
+                </div>
+                 <div class="bg-white dark:bg-gray-800 p-4 rounded-xl shadow border-l-4 border-gray-400">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Seu ID (Dev)</p>
+                    <p id="current-user-id" class="font-mono text-xs break-all text-gray-500 dark:text-gray-300 pt-1"></p>
+                </div>
+            </div>
+
+            <!-- Navegação entre Blocos -->
+            <div id="admin-nav" class="flex space-x-2 p-2 bg-gray-100 dark:bg-gray-700 rounded-xl shadow-inner">
+                <button data-view="dashboard" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i><span>Dashboard</span>
+                </button>
+                <button data-view="animals" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2">
+                    <i data-lucide="paw-print" class="w-5 h-5"></i><span>Gerenciar Animais</span>
+                </button>
+                <button data-view="config" class="flex-1 py-2 px-4 rounded-lg font-semibold transition-all flex items-center justify-center space-x-2">
+                    <i data-lucide="sliders" class="w-5 h-5"></i><span>Configurações Globais</span>
+                </button>
+            </div>
+
+            <!-- === Dashboard Block (Novo!) === -->
+            <div id="admin-dashboard-block" class="space-y-8">
+                <h3 class="text-2xl font-bold text-sky-600 dark:text-sky-400 border-b-2 border-rose-400 pb-2">1. Interesses de Adoção Pendentes</h3>
+                
+                <!-- Lista de Interessados -->
+                <ul id="adoption-interests-list" class="list-none p-0 space-y-3">
+                    <!-- Cards de Interesse serão injetados aqui -->
+                </ul>
+                
+                <h3 class="text-2xl font-bold text-sky-600 dark:text-sky-400 border-b-2 border-rose-400 pb-2 pt-6">2. Gerenciamento de Contadores Públicos</h3>
+
+                <!-- Formulário de Contadores -->
+                <form id="managed-counters-form" class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-xl border-l-4 border-sky-400 space-y-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">Estes valores aparecerão na página inicial.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="resgatados" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Resgatados</label>
+                            <input type="number" id="resgatados" name="resgatados" required min="0" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                        </div>
+                        <div>
+                            <label for="adotados" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Total Adotados</label>
+                            <input type="number" id="adotados" name="adotados" required min="0" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                        </div>
+                        <div>
+                            <label for="aguardando" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Aguardando Doação</label>
+                            <input type="number" id="aguardando" name="aguardando" required min="0" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                        </div>
+                    </div>
+                    <button type="submit" class="py-2 px-4 bg-rose-400 text-gray-800 rounded-lg hover:bg-rose-500 transition-colors font-bold shadow-md">
+                        Salvar Contadores
+                    </button>
+                </form>
+            </div>
+
+            <!-- === Gerenciar Animais Block === -->
+            <div id="admin-animals-block" class="space-y-8 hidden">
+                <h3 class="text-2xl font-bold text-sky-600 dark:text-sky-400 border-b-2 border-rose-400 pb-2">1. Adicionar/Editar Animal</h3>
+
+                <!-- Formulário de Adição/Edição de Animal -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl border-t-4 border-rose-400">
+                    <form id="animal-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="nome" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome</label>
+                                <input type="text" id="nome" name="nome" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                            <div>
+                                <label for="raca" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Raça/Espécie</label>
+                                <input type="text" id="raca" name="raca" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="idade" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Idade (anos)</label>
+                                <input type="number" id="idade" name="idade" required min="0" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                            <div>
+                                <label for="imagemUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300">URL da Imagem (Link direto)</label>
+                                <input type="url" id="imagemUrl" name="imagemUrl" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                        </div>
+                        <div>
+                            <label for="descricao" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Descrição/História</label>
+                            <textarea id="descricao" name="descricao" rows="3" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2"></textarea>
+                        </div>
+                        
+                        <button id="animal-form-submit-btn" type="submit" class="w-full py-3 bg-sky-500 text-white rounded-xl hover:bg-sky-600 transition-colors font-bold shadow-lg flex items-center justify-center space-x-2">
+                            Adicionar Animal
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Lista de Animais (Admin) -->
+                <div class="space-y-4">
+                    <h3 class="text-2xl font-bold text-sky-600 dark:text-sky-400 border-b-2 border-rose-400 pb-2">2. Lista de Resgatados Atuais</h3>
+                    <ul id="animals-list-admin" class="list-none p-0">
+                        <!-- Itens de Animais serão injetados aqui -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- === Configurações Globais Block === -->
+            <div id="admin-config-block" class="space-y-8 hidden">
+
+                <!-- Formulário de Configurações Públicas e Texto -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl border-t-4 border-sky-400">
+                    <h3 class="text-2xl font-bold mb-4 text-sky-600 dark:text-sky-400">1. Informações Públicas e Texto de Apresentação</h3>
+                    <form id="global-config-form" class="space-y-4">
+                        
+                        <div>
+                            <label for="presentationText" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Texto de Apresentação da Página Inicial</label>
+                            <textarea id="presentationText" name="presentationText" rows="3" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2"></textarea>
+                        </div>
+                        
+                        <h4 class="text-xl font-semibold mt-4 text-rose-500 dark:text-rose-400 border-t pt-4 border-gray-200 dark:border-gray-700">Contatos e Localização</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email de Contato</label>
+                                <input type="email" id="email" name="email" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                            <div>
+                                <label for="telefone" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Telefone/WhatsApp</label>
+                                <input type="text" id="telefone" name="telefone" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="instagram" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Instagram (@seuuser)</label>
+                                <input type="text" id="instagram" name="instagram" required class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                            <div>
+                                <label for="mapsLink" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Link do Google Maps (Brechó)</label>
+                                <input type="url" id="mapsLink" name="mapsLink" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                        </div>
+
+                        <!-- Alteração de Senha -->
+                        <h4 class="text-xl font-semibold pt-6 border-t border-gray-200 dark:border-gray-700 text-rose-500 dark:text-rose-400">2. Alterar Senha de Administrador</h4>
+                        <div>
+                            <label for="oldPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha Atual</label>
+                            <input type="password" id="oldPassword" name="oldPassword" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <div>
+                                <label for="newPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nova Senha</label>
+                                <input type="password" id="newPassword" name="newPassword" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                            <div>
+                                <label for="confirmNewPassword" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Confirmar Nova Senha</label>
+                                <input type="password" id="confirmNewPassword" name="confirmNewPassword" class="mt-1 block w-full input-style border-gray-300 dark:border-gray-600 dark:bg-gray-700 p-2">
+                            </div>
+                        </div>
+
+                        <p id="config-error-message" class="text-red-500 text-sm h-4"></p>
+                        <button type="submit" class="w-full py-3 bg-sky-500 text-white rounded-xl hover:bg-sky-600 transition-colors font-bold shadow-lg mt-4">
+                            Salvar Configurações
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Rodapé Principal -->
+    <footer id="main-footer" class="bg-gray-900 dark:bg-gray-900 text-white mt-12">
+        <!-- O conteúdo será injetado por renderPublicConfig() -->
+    </footer>
+
+</body>
+</html>
