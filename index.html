@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.O.S Viralatas by Andrea | Resgate e Adoção Premium (Firebase)</title>
+    <title>S.O.S Viralatas by Andrea | Resgate e Adoção Premium (Versão Local)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
@@ -11,23 +11,28 @@
             font-family: 'Inter', sans-serif;
             transition: background-color 0.4s, color 0.4s;
         }
-        /* Nova Paleta e Estilos */
+        /* NOVA PALETA DE CORES SUAVES: Rose (Alegria/Fofura) e Sky (Paz/Leveza) */
+        /* Modo Escuro Suave (Base: Gray-800) */
         .dark body {
             background-color: #1f2937; 
             color: #f3f4f6; 
         }
+        /* Modo Claro Padrão (Base: Gray-50) */
         .light body {
             background-color: #f9fafb; 
             color: #111827; 
         }
+        /* Estilos base para elementos interativos */
         .input-style {
             transition: border-color 0.3s, box-shadow 0.3s;
-            border-radius: 0.5rem; 
+            border-radius: 0.5rem; /* rounded-lg */
         }
         .input-style:focus {
             outline: none;
-            box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.5); 
+            box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.5); /* Rose-400 shadow */
         }
+        
+        /* Estilo da animação do Easter Egg */
         .cat-dog-animation {
             position: absolute;
             top: 50%;
@@ -36,8 +41,9 @@
             white-space: nowrap;
             animation: move-across-reverse 4s linear forwards;
             transform: translateY(-50%) translateX(100%); 
-            z-index: 50; 
+            z-index: 50; /* Garante que fique acima de outros conteúdos */
         }
+
         @keyframes move-across-reverse {
             0% {
                 transform: translateY(-50%) translateX(100vw); 
@@ -55,46 +61,39 @@
     <script type="module">
         
         // =======================================================
-        // 🚨 CONFIGURAÇÃO E BIBLIOTECAS DO FIREBASE
+        // 🚨 CONFIGURAÇÃO LOCAL SIMPLIFICADA
         // =======================================================
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        const ADMIN_PASSWORD = '1234'; // Senha para acessar o painel
         
-        // ---------------------------------------------
-        // Inicialização do Firebase - SUBSTITUA AQUI!
-        // ---------------------------------------------
-        const firebaseConfig = {
-            apiKey: "SEU_API_KEY_AQUI", 
-            authDomain: "SEU_AUTHDOMAIN_AQUI",
-            projectId: "SEU_PROJECT_ID_AQUI",
-            storageBucket: "SEU_STORAGE_BUCKET_AQUI",
-            messagingSenderId: "SEU_MESSAGING_SENDER_ID_AQUI",
-            appId: "SEU_APP_ID_AQUI"
-        };
-        
-        // Inicializa o app e os serviços
-        let app, db, auth;
-        let isAdminLoggedIn = false;
-        let currentUserId = null;
-
-        try {
-            app = initializeApp(firebaseConfig);
-            db = getFirestore(app);
-            auth = getAuth(app);
-            console.log("Firebase inicializado com sucesso.");
-        } catch(e) {
-            console.error("Erro ao inicializar Firebase. Verifique suas credenciais e a importação dos módulos:", e);
-        }
-
-        // Coleções do Firestore
-        const COLLECTIONS = {
-            ANIMALS: 'animals',
-            STATUS: 'status', 
-            CONFIG: 'config', 
-            INTERESTS: 'adoptionInterests'
+        const LOCAL_STORAGE_KEYS = {
+            ANIMALS: 'sos_animals',
+            STATUS: 'sos_status',
+            CONFIG: 'sos_config',
+            INTERESTS: 'sos_interests',
+            ADMIN_LOGGED_IN: 'sos_admin_logged'
         };
 
+        // Estados Locais (Inicializados com defaults)
+        let isAdminLoggedIn = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_LOGGED_IN)) || false;
+        
+        let appConfig = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.CONFIG)) || { 
+            email: 'contato@sosviralatas.org', 
+            telefone: '(XX) 9XXXX-XXXX', 
+            instagram: '@sosviralatas', 
+            mapsLink: 'https://maps.app.goo.gl/exemplo' 
+        }; 
+        
+        let appStatus = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.STATUS)) || { 
+            resgatados_count: 0, 
+            adotados_count: 0, 
+            aguardando_adocao_count: 0, 
+            site_views_count: 0, 
+            presentation_text: 'Bem-vindos ao S.O.S Viralatas by Andrea! Nossa missão é dar uma segunda chance a cães e gatos resgatados, encontrando lares amorosos para eles.' 
+        }; 
+        
+        let animalsList = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.ANIMALS)) || []; 
+        let interestsList = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.INTERESTS)) || []; 
+        
         // Elementos da UI
         const adminSection = document.getElementById('admin-section');
         const publicSection = document.getElementById('public-section');
@@ -104,51 +103,97 @@
         const adminToggleBtn = document.getElementById('toggle-admin');
         const themeToggleBtn = document.getElementById('theme-toggle');
         const headerElement = document.getElementById('main-header'); 
-        const statusDocRef = doc(db, COLLECTIONS.STATUS, 'global');
-        const configDocRef = doc(db, COLLECTIONS.CONFIG, 'global');
         
         // Estado da Admin View
         let currentAdminView = 'dashboard'; 
-        let appStatus = {};
-        let appConfig = {};
-        let interestsList = [];
-        
+
         // Variável para o Easter Egg
         let themeToggleClickCount = 0;
         const EASTER_EGG_LIMIT = 13;
 
 
-        // =======================================================
-        // 1. AUTENTICAÇÃO E LÓGICA DE VISUALIZAÇÃO
-        // =======================================================
+        // --- Funções de Persistência (LocalStorage) ---
 
-        /** Verifica o estado da autenticação (Login) */
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // Usuário logado
-                isAdminLoggedIn = true;
-                currentUserId = user.uid;
-                if (loginSection.classList.contains('hidden') === false) {
-                   setView('admin'); // Vai para a área admin após login
-                }
-                document.getElementById('current-user-id').textContent = user.email || user.uid;
-            } else {
-                // Usuário deslogado
-                isAdminLoggedIn = false;
-                currentUserId = null;
-                // Se estava na admin, volta para a pública
-                if (adminSection.classList.contains('hidden') === false) {
-                    setView('public');
-                }
-                document.getElementById('current-user-id').textContent = 'Admin (Deslogado)';
+        function saveState(key, data) {
+            localStorage.setItem(key, JSON.stringify(data));
+        }
+        
+        function saveAll() {
+            saveState(LOCAL_STORAGE_KEYS.ANIMALS, animalsList);
+            saveState(LOCAL_STORAGE_KEYS.STATUS, appStatus);
+            saveState(LOCAL_STORAGE_KEYS.CONFIG, appConfig);
+            saveState(LOCAL_STORAGE_KEYS.INTERESTS, interestsList);
+            saveState(LOCAL_STORAGE_KEYS.ADMIN_LOGGED_IN, isAdminLoggedIn);
+            
+            // Re-renderiza após salvar
+            renderPublicConfig();
+            renderPublicStatus(); 
+            renderAdminIndicators();
+            renderAnimals(animalsList, isAdminLoggedIn);
+            renderInterestsListAdmin(interestsList);
+        }
+
+        /** Inicializa e carrega a configuração pública/status e incrementa view. */
+        function initializeConfigs() {
+            // Incrementa o contador de visitas (Se não for admin)
+            if (!isAdminLoggedIn) { 
+                appStatus.site_views_count = (appStatus.site_views_count || 0) + 1;
+                saveState(LOCAL_STORAGE_KEYS.STATUS, appStatus); 
             }
-            // Garante que o estado correto seja exibido
-            if (!loginSection.classList.contains('hidden')) {
-                 adminToggleBtn.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
-            }
+            saveAll(); // Garante o render inicial
+        }
+
+        // --- 1. Funções de Layout e Estado ---
+
+        /** Alterna entre modo escuro e claro E gerencia o Easter Egg */
+        themeToggleBtn.addEventListener('click', () => {
+            // 1. Lógica do Tema
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            themeToggleBtn.innerHTML = isDark 
+                ? '<i data-lucide="sun" class="w-6 h-6 text-rose-400"></i>' 
+                : '<i data-lucide="moon" class="w-6 h-6 text-gray-800"></i>';
             lucide.createIcons();
+
+            // 2. Lógica do Easter Egg
+            themeToggleClickCount++;
+            if (themeToggleClickCount >= EASTER_EGG_LIMIT) {
+                themeToggleClickCount = 0; 
+                triggerEasterEgg();
+            }
+        });
+        
+        // Listener para alternar a visualização entre Público e Login/Admin
+        adminToggleBtn.addEventListener('click', () => {
+            if (publicSection.classList.contains('hidden') === false) {
+                setView('login'); // Abre a tela de login
+            } 
+            else {
+                if (isAdminLoggedIn) {
+                    isAdminLoggedIn = false;
+                    showModal("Sessão Encerrada", "Você saiu da área administrativa.");
+                    saveAll(); 
+                    setView('public');
+                } else {
+                    setView('public'); // Volta para a tela pública
+                }
+            }
         });
 
+        /** Ativa a animação do gato e do cão */
+        function triggerEasterEgg() {
+            if (!headerElement) return;
+
+            const animationElement = document.createElement('div');
+            animationElement.className = 'cat-dog-animation'; 
+            animationElement.innerHTML = '🐈🐕'; 
+            
+            headerElement.appendChild(animationElement);
+
+            setTimeout(() => {
+                animationElement.remove();
+            }, 4100);
+        }
 
         /** * Gerencia a visibilidade das seções principais
          * @param {string} view 'public', 'login', ou 'admin'
@@ -171,15 +216,14 @@
 
                 if (view === 'login') {
                     loginSection.classList.remove('hidden');
-                } else if (view === 'admin' && isAdminLoggedIn) {
+                } else if (view === 'admin') {
                     adminSection.classList.remove('hidden');
                     setAdminView(currentAdminView); 
-                    // Ouve as mudanças de dados ao entrar no admin
-                    startRealtimeListeners();
-                } else if (view === 'admin' && !isAdminLoggedIn) {
-                    setView('login'); // Se tentar ir para admin sem login, vai para login
+                    // Remove ID do usuário, pois o login é local
+                    document.getElementById('current-user-id').textContent = 'Admin Local'; 
                 }
             }
+
             lucide.createIcons();
         }
 
@@ -221,211 +265,129 @@
             btn.addEventListener('click', () => setAdminView(btn.dataset.view));
         });
 
-        // Listener para alternar a visualização entre Público e Login/Admin
-        adminToggleBtn.addEventListener('click', () => {
-            if (publicSection.classList.contains('hidden') === false) {
-                setView('login'); // Abre a tela de login
-            } 
-            else {
-                if (isAdminLoggedIn) {
-                    handleLogout(); // Faz logout se já estiver logado
-                } else {
-                    setView('public'); // Volta para a tela pública
-                }
-            }
-        });
 
-        // Listener para login
-        document.getElementById('admin-login-form').addEventListener('submit', handleLogin);
+        // --- 2. Autenticação Local (Senha Simples) ---
 
-
-        /** Lida com o Login */
-        async function handleLogin(e) {
+        document.getElementById('admin-login-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            const email = e.target.email.value;
-            const password = e.target.password.value;
+            
+            // O campo 'username' será tratado como a senha nesta versão
+            const passwordInput = e.target.username.value; 
             const loginErrorMessage = document.getElementById('login-error-message');
+            
             loginErrorMessage.textContent = '';
             
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-                // onAuthStateChanged cuidará da transição para a view 'admin'
+            if (passwordInput === ADMIN_PASSWORD) {
+                isAdminLoggedIn = true;
+                saveState(LOCAL_STORAGE_KEYS.ADMIN_LOGGED_IN, true);
+                setView('admin');
                 showModal("Bem-vindo, Andrea!", "Login de administração realizado com sucesso.");
-                e.target.reset(); 
-            } catch (error) {
-                console.error("Erro no login:", error);
-                loginErrorMessage.textContent = 'Erro no login: Credenciais inválidas ou o usuário não existe.';
-            }
-        }
-
-        /** Lida com o Logout */
-        async function handleLogout() {
-            try {
-                await signOut(auth);
-                // onAuthStateChanged cuidará da transição para a view 'public'
-                showModal("Sessão Encerrada", "Você saiu da área administrativa.");
-            } catch (error) {
-                console.error("Erro ao sair:", error);
-                showModal("Erro", "Não foi possível encerrar a sessão.");
-            }
-        }
-
-        /** Alterna entre modo escuro e claro E gerencia o Easter Egg */
-        themeToggleBtn.addEventListener('click', () => {
-            // 1. Lógica do Tema
-            document.documentElement.classList.toggle('dark');
-            const isDark = document.documentElement.classList.contains('dark');
-            themeToggleBtn.innerHTML = isDark 
-                ? '<i data-lucide="sun" class="w-6 h-6 text-rose-400"></i>' 
-                : '<i data-lucide="moon" class="w-6 h-6 text-gray-800"></i>';
-            lucide.createIcons();
-
-            // 2. Lógica do Easter Egg
-            themeToggleClickCount++;
-            if (themeToggleClickCount >= EASTER_EGG_LIMIT) {
-                themeToggleClickCount = 0; 
-                triggerEasterEgg();
+                e.target.reset(); // Limpa o formulário
+            } else {
+                loginErrorMessage.textContent = 'Senha incorreta. A senha é: 1234';
             }
         });
+
         
-        /** Ativa a animação do gato e do cão */
-        function triggerEasterEgg() {
-            if (!headerElement) return;
-            const animationElement = document.createElement('div');
-            animationElement.className = 'cat-dog-animation'; 
-            animationElement.innerHTML = '🐈🐕'; 
-            headerElement.appendChild(animationElement);
-            setTimeout(() => {
-                animationElement.remove();
-            }, 4100);
-        }
-
-        // =======================================================
-        // 2. SINCRONIZAÇÃO COM FIRESTORE (Realtime e Inicial)
-        // =======================================================
-        
-        /** Inicia todos os listeners de tempo real (Admin Dashboard) */
-        function startRealtimeListeners() {
-             // Listener para Status/Contadores e Texto de Apresentação (Global)
-            onSnapshot(statusDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    appStatus = docSnap.data();
-                    renderPublicStatus(); 
-                    renderAdminIndicators();
-                } else {
-                    console.log("Documento de Status Global não encontrado.");
-                }
-            });
-
-            // Listener para Interessados (Dashboard Admin)
-            const qInterests = query(collection(db, COLLECTIONS.INTERESTS), orderBy('dataSubmissao', 'desc'), limit(15));
-            onSnapshot(qInterests, (querySnapshot) => {
-                interestsList = [];
-                querySnapshot.forEach((doc) => {
-                    interestsList.push({ id: doc.id, ...doc.data() });
-                });
-                renderInterestsListAdmin(interestsList);
-                renderAdminIndicators(); // Para atualizar o contador
-            });
-            
-            // Listener para Animais (Público e Admin)
-            const qAnimals = query(collection(db, COLLECTIONS.ANIMALS), orderBy('dataCriacao', 'desc'));
-            onSnapshot(qAnimals, (querySnapshot) => {
-                let animals = [];
-                querySnapshot.forEach((doc) => {
-                    animals.push({ id: doc.id, ...doc.data() });
-                });
-                renderAnimals(animals, isAdminLoggedIn);
-            });
-        }
-
-
-        /** Carrega a configuração inicial (uma única vez) */
-        async function loadInitialData() {
-            try {
-                // 1. Carregar Configurações (Contatos e Links)
-                const configSnap = await getDoc(configDocRef);
-                if (configSnap.exists()) {
-                    appConfig = configSnap.data();
-                    renderPublicConfig();
-                } else {
-                    console.log("Documento de Configuração Global não encontrado.");
-                    // Cria um placeholder se não existir
-                    await setDoc(configDocRef, { 
-                        email: 'contato@sosviralatas.org', 
-                        telefone: '(XX) 9XXXX-XXXX', 
-                        instagram: '@sosviralatas', 
-                        mapsLink: 'http://maps.google.com/0' 
-                    });
-                }
-                
-                // 2. Incrementar e carregar Status/Views
-                await incrementSiteView();
-                
-            } catch(e) {
-                console.error("Erro ao carregar dados iniciais:", e);
-            }
-        }
-        
-        /** Incrementa o contador de visitas do site. */
-        async function incrementSiteView() {
-            if (isAdminLoggedIn) return; // Não conta a visualização do Admin logado
-
-            try {
-                // Tenta atualizar o campo site_views_count, adicionando 1.
-                // Firebase.FieldValue.increment não existe no módulo importado. 
-                // Fazemos a leitura, incremento manual, e escrita (é atômico, mas requer regras de segurança adequadas).
-                
-                const snap = await getDoc(statusDocRef);
-                let views = 0;
-                if (snap.exists() && snap.data().site_views_count) {
-                    views = snap.data().site_views_count;
-                }
-                
-                await setDoc(statusDocRef, { 
-                    site_views_count: views + 1, 
-                    // Preserva outros campos se existirem, ou define um default
-                    presentation_text: snap.exists() ? snap.data().presentation_text : 'Bem-vindos ao S.O.S Viralatas by Andrea! Nossa missão é dar uma segunda chance a cães e gatos resgatados, encontrando lares amorosos para eles.'
-                }, { merge: true });
-                
-            } catch (e) {
-                 console.error("Erro ao incrementar views. Verifique as regras de segurança do Firestore:", e);
-            }
-        }
-
-
-        // =======================================================
-        // 3. RENDERIZAÇÃO E ADMIN (Funções de UI)
-        // =======================================================
+        // --- 3. Renderização de Status e Contadores ---
 
         /** Renderiza o texto de apresentação e os contadores na página pública. */
         function renderPublicStatus() {
-            presentationTextElement.textContent = appStatus.presentation_text || 'Carregando...';
+            presentationTextElement.textContent = appStatus.presentation_text;
 
             document.getElementById('resgatados-count').textContent = appStatus.resgatados_count || 0;
             document.getElementById('adotados-count').textContent = appStatus.adotados_count || 0;
             document.getElementById('adocao-count').textContent = appStatus.aguardando_adocao_count || 0;
+            // Atualiza o contador de visitas também na área pública
             document.getElementById('site-views-count').textContent = appStatus.site_views_count || 0;
         }
 
         /** Renderiza os indicadores no topo do Painel Admin. */
         function renderAdminIndicators() {
             document.getElementById('admin-views-count').textContent = appStatus.site_views_count || 0;
-            // A contagem de animais disponíveis e a lista de interesses vêm dos listeners
-            document.getElementById('admin-available-animals').textContent = document.getElementById('animals-list-admin').children.length; 
+            document.getElementById('admin-available-animals').textContent = animalsList.length; 
             document.getElementById('interests-count').textContent = interestsList.length; 
             document.getElementById('adotados-count-dashboard').textContent = appStatus.adotados_count || 0;
         }
 
-        /** Renderiza contatos e link do mapa na área pública. */
-        function renderPublicConfig() {
-            document.getElementById('public-email').textContent = appConfig.email || 'N/A';
-            document.getElementById('public-phone').textContent = appConfig.telefone || 'N/A';
-            document.getElementById('public-instagram').textContent = appConfig.instagram || 'N/A';
-            document.getElementById('public-maps-link').href = appConfig.mapsLink || '#';
-            document.getElementById('public-maps-link').target = '_blank';
+
+        // --- 4. Gerenciamento dos Contadores na Admin Config ---
+
+        /** Popula o formulário de contadores gerenciados com dados atuais */
+        function populateManagedCountersForm() {
+            const form = document.getElementById('managed-counters-form');
+            if (form) {
+                form.querySelector('#resgatados').value = appStatus.resgatados_count || 0;
+                form.querySelector('#adotados').value = appStatus.adotados_count || 0;
+                form.querySelector('#aguardando').value = appStatus.aguardando_adocao_count || 0;
+            }
         }
 
+        document.getElementById('managed-counters-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você não está logado como Admin."); return; }
+
+            appStatus.resgatados_count = parseInt(e.target.resgatados.value) || 0;
+            appStatus.adotados_count = parseInt(e.target.adotados.value) || 0;
+            appStatus.aguardando_adocao_count = parseInt(e.target.aguardando.value) || 0;
+            
+            saveAll();
+            showModal("Sucesso", "Contadores de Resgate/Adoção atualizados e salvos localmente!");
+        });
+
+        // --- 5. Gerenciamento do Formulário de Interesse em Adoção ---
+
+        const adoptionInterestForm = document.getElementById('adoption-interest-form');
+
+        /** Abre o modal de interesse em adoção. */
+        function openAdoptionModal(animalId, animalName) {
+            document.getElementById('interest-animal-name').textContent = animalName;
+            adoptionInterestForm.dataset.animalId = animalId;
+            adoptionInterestForm.dataset.animalName = animalName;
+            document.getElementById('adoption-modal').classList.remove('hidden');
+            document.getElementById('adoption-interest-error').textContent = '';
+        }
+
+        /** Fecha o modal de interesse. */
+        document.getElementById('adoption-modal-close').addEventListener('click', () => {
+            document.getElementById('adoption-modal').classList.add('hidden');
+            adoptionInterestForm.reset();
+        });
+
+        adoptionInterestForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const animalId = adoptionInterestForm.dataset.animalId;
+            const animalName = adoptionInterestForm.dataset.animalName;
+            
+            const data = {
+                id: Date.now(), // ID simples baseado no tempo
+                nome: e.target.interestName.value.trim(),
+                telefone: e.target.interestPhone.value.trim(),
+                email: e.target.interestEmail.value.trim() || 'Não fornecido',
+                dataSubmissao: Date.now(),
+                animalId: animalId,
+                animalNome: animalName
+            };
+            
+            const errorElement = document.getElementById('adoption-interest-error');
+            errorElement.textContent = '';
+
+            if (!data.nome || !data.telefone) {
+                errorElement.textContent = 'Nome e Telefone são campos obrigatórios.';
+                return;
+            }
+
+            interestsList.unshift(data); // Adiciona no início
+            saveAll();
+            
+            showModal("Obrigado!", `Seu interesse em ${animalName} foi registrado! O Admin verá em breve (salvo localmente).`);
+            document.getElementById('adoption-modal').classList.add('hidden');
+            adoptionInterestForm.reset();
+        });
+
+        // --- 6. Lista de Interessados em Adoção (Local) ---
+        
         /** Renderiza a lista de interessados na Dashboard Admin. */
         function renderInterestsListAdmin(list) {
             const container = document.getElementById('adoption-interests-list');
@@ -455,11 +417,34 @@
             });
             lucide.createIcons();
         }
+        
+        // Listener para deletar interesse (marcar como lido)
+        document.getElementById('adoption-interests-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.delete-interest-btn');
+            if (btn) {
+                 if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você não está logado como Admin."); return; }
+                const id = parseInt(btn.dataset.id); // ID agora é um número
 
+                const isConfirmed = await showConfirmModal("Marcar como Tratado", "Marcar este interesse como tratado e remover da lista? (Esta ação é irreversível na versão local)");
+                
+                if (!isConfirmed) return;
+
+                interestsList = interestsList.filter(item => item.id !== id);
+                saveAll();
+                showModal("Sucesso", "Interesse removido da lista e salvo localmente.");
+            }
+        });
+
+
+        // --- 7. CRUD de Animais (Local) ---
+        
         /** Renderiza as listas de animais na área pública e administrativa. */
         function renderAnimals(animals, isAdminView) {
             document.getElementById('animals-list-admin').innerHTML = '';
             animalsListPublic.innerHTML = '';
+
+            // Ordena do mais recente para o mais antigo
+            animals.sort((a, b) => (b.dataCriacao || 0) - (a.dataCriacao || 0));
 
             if (animals.length === 0) {
                 animalsListPublic.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 p-4">Nenhum animal resgatado cadastrado ainda. 🐾</p>';
@@ -483,7 +468,7 @@
             renderAdminIndicators();
         }
 
-        /** Cria o card/item de animal. */
+        /** Cria o card/item de animal. (A mesma função do Firebase, pois a estrutura de dados é a mesma) */
         function createAnimalCard(animal, isAdmin) {
             const container = document.createElement(isAdmin ? 'li' : 'div');
             container.className = isAdmin 
@@ -535,15 +520,15 @@
             return container;
         }
 
-        // =======================================================
-        // 4. CRUD DE ANIMAIS (Firestore)
-        // =======================================================
-        
+        // --- 8. CRUD Funções do Admin (Local) ---
+
+        // Estado do formulário
         let isEditing = false;
         let currentAnimalId = null;
 
         /** Abre o formulário para adicionar ou editar um animal. */
         function openAnimalForm(animal = null) {
+            // ... (mesma função)
             const form = document.getElementById('animal-form');
             document.getElementById('animal-form-title').textContent = animal ? `Editar Animal: ${animal.nome}` : 'Adicionar Novo Animal';
             isEditing = !!animal;
@@ -562,21 +547,23 @@
             document.getElementById('animal-modal').classList.remove('hidden');
         }
         
+        // Listener para abrir o modal
         document.getElementById('add-animal-btn').addEventListener('click', () => openAnimalForm());
+        
+        // Listener para fechar o modal
         document.getElementById('animal-modal-close').addEventListener('click', () => {
             document.getElementById('animal-modal').classList.add('hidden');
         });
 
+        /** Popula o formulário para edição. */
         function editAnimal(animal) {
             openAnimalForm(animal);
         }
 
-        document.getElementById('animal-form').addEventListener('submit', handleSaveAnimal);
-
-        /** Salva ou atualiza um animal no Firestore. */
-        async function handleSaveAnimal(e) {
+        /** Salva ou atualiza um animal no LocalStorage. */
+        document.getElementById('animal-form').addEventListener('submit', (e) => {
             e.preventDefault();
-            if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Admin necessário."); return; }
 
             const animalData = {
                 nome: e.target.nome.value.trim(),
@@ -585,162 +572,47 @@
                 sexo: e.target.sexo.value,
                 imagemUrl: e.target.imagemUrl.value.trim(),
                 descricao: e.target.descricao.value.trim(),
-                dataCriacao: new Date().getTime() // Carimbo de data/hora atual (para ordenação)
+                dataCriacao: isEditing ? (animalsList.find(a => a.id === currentAnimalId)?.dataCriacao || Date.now()) : Date.now()
             };
 
             const modal = document.getElementById('animal-modal');
 
-            try {
-                if (isEditing && currentAnimalId) {
-                    // Atualiza
-                    const animalRef = doc(db, COLLECTIONS.ANIMALS, currentAnimalId);
-                    await updateDoc(animalRef, animalData);
-                    showModal("Sucesso", `Animal ${animalData.nome} atualizado no Firebase!`);
-                } else {
-                    // Adiciona
-                    await addDoc(collection(db, COLLECTIONS.ANIMALS), animalData);
-                    showModal("Sucesso", `Animal ${animalData.nome} adicionado ao Firebase!`);
+            if (isEditing && currentAnimalId) {
+                // Atualiza
+                const index = animalsList.findIndex(a => a.id === currentAnimalId);
+                if (index !== -1) {
+                    animalsList[index] = { ...animalsList[index], ...animalData, id: currentAnimalId }; // Preserva o ID
+                    showModal("Sucesso", `Animal ${animalData.nome} atualizado! (Salvo localmente)`);
                 }
-                
-                modal.classList.add('hidden');
-                e.target.reset();
-            } catch (error) {
-                console.error("Erro ao salvar animal:", error);
-                showModal("Erro", "Falha ao salvar o animal. Verifique suas regras de segurança do Firestore.");
+            } else {
+                // Adiciona
+                animalData.id = Date.now(); // ID baseado no tempo para unicidade
+                animalsList.push(animalData);
+                showModal("Sucesso", `Animal ${animalData.nome} adicionado! (Salvo localmente)`);
             }
-        }
+            
+            saveAll();
+            modal.classList.add('hidden');
+        });
 
-        /** Deleta um animal do Firestore. */
+        /** Deleta um animal do LocalStorage. */
         async function deleteAnimal(id, nome) {
-            if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Admin necessário."); return; }
 
-            const isConfirmed = await showConfirmModal("Confirmar Exclusão", `Tem certeza que deseja remover o animal ${nome}? Esta ação é irreversível.`);
+            const isConfirmed = await showConfirmModal("Confirmar Exclusão", `Tem certeza que deseja remover o animal ${nome} do registro? (Esta ação é irreversível na versão local)`);
             
             if (!isConfirmed) return;
 
-            try {
-                const animalRef = doc(db, COLLECTIONS.ANIMALS, id);
-                await deleteDoc(animalRef);
-                showModal("Sucesso", `Animal ${nome} removido do Firebase!`);
-            } catch (error) {
-                console.error("Erro ao deletar animal:", error);
-                showModal("Erro", "Falha ao deletar o animal. Verifique suas regras de segurança do Firestore.");
-            }
+            animalsList = animalsList.filter(animal => animal.id !== id);
+            saveAll();
+            showModal("Sucesso", `Animal ${nome} removido! (Salvo localmente)`);
         }
 
-
-        // =======================================================
-        // 5. GERENCIAMENTO DE INTERESSES (Firestore)
-        // =======================================================
-
-        const adoptionInterestForm = document.getElementById('adoption-interest-form');
-
-        function openAdoptionModal(animalId, animalName) {
-            document.getElementById('interest-animal-name').textContent = animalName;
-            adoptionInterestForm.dataset.animalId = animalId;
-            adoptionInterestForm.dataset.animalName = animalName;
-            document.getElementById('adoption-modal').classList.remove('hidden');
-            document.getElementById('adoption-interest-error').textContent = '';
-        }
-
-        document.getElementById('adoption-modal-close').addEventListener('click', () => {
-            document.getElementById('adoption-modal').classList.add('hidden');
-            adoptionInterestForm.reset();
-        });
-
-        adoptionInterestForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const animalId = adoptionInterestForm.dataset.animalId;
-            const animalName = adoptionInterestForm.dataset.animalName;
-            
-            const data = {
-                nome: e.target.interestName.value.trim(),
-                telefone: e.target.interestPhone.value.trim(),
-                email: e.target.interestEmail.value.trim() || 'Não fornecido',
-                dataSubmissao: new Date().getTime(),
-                animalId: animalId,
-                animalNome: animalName,
-                status: 'pendente'
-            };
-            
-            const errorElement = document.getElementById('adoption-interest-error');
-            errorElement.textContent = '';
-
-            if (!data.nome || !data.telefone) {
-                errorElement.textContent = 'Nome e Telefone são campos obrigatórios.';
-                return;
-            }
-
-            try {
-                await addDoc(collection(db, COLLECTIONS.INTERESTS), data);
-                showModal("Obrigado!", `Seu interesse em ${animalName} foi registrado no Firebase! O Admin verá em breve.`);
-                document.getElementById('adoption-modal').classList.add('hidden');
-                adoptionInterestForm.reset();
-            } catch (error) {
-                 console.error("Erro ao registrar interesse:", error);
-                showModal("Erro", "Falha ao registrar interesse. Verifique suas regras de segurança do Firestore (escrita pública).");
-            }
-        });
-        
-        // Listener para deletar interesse (marcar como tratado)
-        document.getElementById('adoption-interests-list').addEventListener('click', async (e) => {
-            const btn = e.target.closest('.delete-interest-btn');
-            if (btn) {
-                 if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
-                const id = btn.dataset.id;
-
-                const isConfirmed = await showConfirmModal("Marcar como Tratado", "Marcar este interesse como tratado e remover da lista? (Esta ação é irreversível)");
-                
-                if (!isConfirmed) return;
-
-                try {
-                    const interestRef = doc(db, COLLECTIONS.INTERESTS, id);
-                    await deleteDoc(interestRef);
-                    showModal("Sucesso", "Interesse removido do Firebase.");
-                } catch (error) {
-                    console.error("Erro ao deletar interesse:", error);
-                    showModal("Erro", "Falha ao remover interesse. Verifique suas regras de segurança do Firestore.");
-                }
-            }
-        });
-
-
-        // =======================================================
-        // 6. CONFIGURAÇÕES GLOBAIS E CONTADORES (Firestore)
-        // =======================================================
-
-        /** Popula o formulário de contadores gerenciados com dados atuais */
-        function populateManagedCountersForm() {
-            const form = document.getElementById('managed-counters-form');
-            if (form) {
-                form.querySelector('#resgatados').value = appStatus.resgatados_count || 0;
-                form.querySelector('#adotados').value = appStatus.adotados_count || 0;
-                form.querySelector('#aguardando').value = appStatus.aguardando_adocao_count || 0;
-            }
-        }
-
-        document.getElementById('managed-counters-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
-
-            const data = {
-                resgatados_count: parseInt(e.target.resgatados.value) || 0,
-                adotados_count: parseInt(e.target.adotados.value) || 0,
-                aguardando_adocao_count: parseInt(e.target.aguardando.value) || 0,
-            };
-            
-            try {
-                await updateDoc(statusDocRef, data);
-                showModal("Sucesso", "Contadores de Resgate/Adoção atualizados no Firebase!");
-            } catch (error) {
-                console.error("Erro ao atualizar contadores:", error);
-                showModal("Erro", "Falha ao atualizar contadores. Verifique suas regras de segurança do Firestore.");
-            }
-        });
+        // --- 9. Configurações Globais (Contatos e Texto) (Local) ---
 
         /** Popula o formulário de configurações globais com dados atuais */
         function populateGlobalConfigForm() {
+            // ... (mesma função)
             const form = document.getElementById('global-config-form');
             if (form) {
                 form.querySelector('#contact-email').value = appConfig.email || '';
@@ -751,40 +623,35 @@
             }
         }
 
-        document.getElementById('global-config-form').addEventListener('submit', async (e) => {
+        /** Renderiza contatos e link do mapa na área pública. */
+        function renderPublicConfig() {
+            document.getElementById('public-email').textContent = appConfig.email || 'N/A';
+            document.getElementById('public-phone').textContent = appConfig.telefone || 'N/A';
+            document.getElementById('public-instagram').textContent = appConfig.instagram || 'N/A';
+            document.getElementById('public-maps-link').href = appConfig.mapsLink || '#';
+            document.getElementById('public-maps-link').target = '_blank';
+        }
+
+        document.getElementById('global-config-form').addEventListener('submit', (e) => {
             e.preventDefault();
-             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Admin necessário."); return; }
 
-            const configData = {
-                email: e.target.querySelector('#contact-email').value.trim(),
-                telefone: e.target.querySelector('#contact-phone').value.trim(),
-                instagram: e.target.querySelector('#contact-instagram').value.trim(),
-                mapsLink: e.target.querySelector('#maps-link').value.trim()
-            };
+            appConfig.email = e.target.querySelector('#contact-email').value.trim();
+            appConfig.telefone = e.target.querySelector('#contact-phone').value.trim();
+            appConfig.instagram = e.target.querySelector('#contact-instagram').value.trim();
+            appConfig.mapsLink = e.target.querySelector('#maps-link').value.trim();
             
-            const statusData = {
-                presentation_text: e.target.querySelector('#presentation-text-input').value.trim()
-            };
+            appStatus.presentation_text = e.target.querySelector('#presentation-text-input').value.trim();
 
-            try {
-                // Atualiza Config
-                await updateDoc(configDocRef, configData);
-                // Atualiza Status (Texto de Apresentação)
-                await updateDoc(statusDocRef, statusData);
-
-                showModal("Sucesso", "Configurações Globais atualizadas no Firebase!");
-            } catch (error) {
-                console.error("Erro ao atualizar configurações:", error);
-                showModal("Erro", "Falha ao atualizar configurações. Verifique suas regras de segurança do Firestore.");
-            }
+            saveAll();
+            showModal("Sucesso", "Configurações Globais atualizadas e salvas localmente!");
         });
 
 
-        // =======================================================
-        // 7. FUNÇÕES DE MODAL
-        // =======================================================
+        // --- 10. Funções de Modal ---
 
         function showModal(title, message) {
+            // ... (mesma função)
             document.getElementById('modal-title').textContent = title;
             document.getElementById('modal-message').textContent = message;
             document.getElementById('global-modal').classList.remove('hidden');
@@ -795,6 +662,7 @@
         });
         
         function showConfirmModal(title, message) {
+            // ... (mesma função)
             return new Promise(resolve => {
                 const confirmModal = document.getElementById('confirm-modal');
                 const confirmTitle = document.getElementById('confirm-modal-title');
@@ -828,13 +696,12 @@
 
         // Chamar a função de inicialização
         document.addEventListener('DOMContentLoaded', () => {
-            loadInitialData(); // Carrega dados iniciais e incrementa views
-            
-            // Inicia o listener de animais e interesses para o caso de já estar logado
-            startRealtimeListeners(); 
-            
-            // onAuthStateChanged cuidará da definição inicial da view ('public' ou 'admin')
-            // Se não estiver logado, a view será 'public' por padrão.
+            initializeConfigs();
+            if (isAdminLoggedIn) {
+                setView('admin');
+            } else {
+                setView('public');
+            }
         });
     </script>
 </head>
@@ -866,8 +733,7 @@
                     Amor Resgata. Amor Acolhe.
                 </h2>
                 <p id="presentation-text" class="max-w-3xl mx-auto text-lg text-gray-700 dark:text-gray-300">
-                    Carregando texto de apresentação...
-                </p>
+                    </p>
             </div>
 
             <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Nossos Números</h3>
@@ -899,17 +765,17 @@
                 <div>
                     <i data-lucide="mail" class="w-8 h-8 text-rose-500 mx-auto mb-2"></i>
                     <p class="font-bold text-lg">Email</p>
-                    <p id="public-email" class="text-gray-700 dark:text-gray-300">Carregando...</p>
+                    <p id="public-email" class="text-gray-700 dark:text-gray-300">contato@sosviralatas.org</p>
                 </div>
                 <div>
                     <i data-lucide="phone" class="w-8 h-8 text-rose-500 mx-auto mb-2"></i>
                     <p class="font-bold text-lg">Telefone</p>
-                    <p id="public-phone" class="text-gray-700 dark:text-gray-300">Carregando...</p>
+                    <p id="public-phone" class="text-gray-700 dark:text-gray-300">(XX) 9XXXX-XXXX</p>
                 </div>
                 <div>
                     <i data-lucide="instagram" class="w-8 h-8 text-rose-500 mx-auto mb-2"></i>
                     <p class="font-bold text-lg">Instagram</p>
-                    <p id="public-instagram" class="text-gray-700 dark:text-gray-300">Carregando...</p>
+                    <p id="public-instagram" class="text-gray-700 dark:text-gray-300">@sosviralatas</p>
                 </div>
             </div>
             
@@ -924,16 +790,13 @@
 
         <section id="login-section" class="hidden max-w-lg mx-auto py-20">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-sky-100 dark:border-sky-800">
-                <h2 class="text-3xl font-bold text-sky-600 dark:text-sky-400 mb-6 text-center">Login Administrativo (Firebase)</h2>
+                <h2 class="text-3xl font-bold text-sky-600 dark:text-sky-400 mb-6 text-center">Login Administrativo (Senha Única)</h2>
                 <form id="admin-login-form" class="space-y-6">
                     <div>
-                        <label for="email" class="block text-sm font-medium mb-1">Email</label>
-                        <input type="email" id="email" name="email" class="w-full p-3 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                        <label for="username" class="block text-sm font-medium mb-1">Senha de Admin (Padrão: 1234)</label>
+                        <input type="password" id="username" name="username" class="w-full p-3 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
                     </div>
-                    <div>
-                        <label for="password" class="block text-sm font-medium mb-1">Senha</label>
-                        <input type="password" id="password" name="password" class="w-full p-3 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
-                    </div>
+                    <input type="hidden" id="password" name="password" value="NaoUsado"> 
 
                     <p id="login-error-message" class="text-red-500 text-sm font-semibold h-5"></p>
                     <button type="submit" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg transition-colors shadow-md flex items-center justify-center space-x-2">
@@ -947,7 +810,7 @@
         <section id="admin-section" class="hidden">
             <h2 class="text-4xl font-extrabold text-sky-600 dark:text-sky-400 mb-8 flex justify-between items-center">
                 Painel Administrativo
-                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Usuário ID: <span id="current-user-id">Carregando...</span></span>
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Usuário ID: <span id="current-user-id">Admin Local</span></span>
             </h2>
 
             <div id="admin-nav" class="flex space-x-2 mb-8 p-2 rounded-xl bg-gray-100 dark:bg-gray-700 shadow-inner">
@@ -996,7 +859,7 @@
                     </div>
                 </div>
 
-                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 pt-6">Interesses de Adoção Recentes (Firebase)</h3>
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 pt-6">Interesses de Adoção Recentes (Salvo no Navegador)</h3>
                 <ul id="adoption-interests-list" class="space-y-4">
                     </ul>
             </div>
@@ -1035,7 +898,7 @@
                         </div>
                         <div class="pt-4">
                             <button type="submit" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md">
-                                Salvar Contadores no Firebase
+                                Salvar Contadores
                             </button>
                         </div>
                     </form>
@@ -1070,7 +933,7 @@
                         
                         <div class="pt-4">
                             <button type="submit" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md">
-                                Salvar Informações no Firebase
+                                Salvar Informações Públicas
                             </button>
                         </div>
                     </form>
@@ -1142,7 +1005,7 @@
                 </div>
                 <div class="pt-4">
                     <button type="submit" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
-                        Salvar Animal no Firebase
+                        Salvar Animal
                     </button>
                 </div>
             </form>
@@ -1174,7 +1037,7 @@
                 <p id="adoption-interest-error" class="text-red-500 text-sm font-semibold h-5"></p>
                 <div class="pt-4">
                     <button type="submit" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
-                        Registrar Interesse (Salvar no Firebase)
+                        Registrar Interesse
                     </button>
                 </div>
             </form>
