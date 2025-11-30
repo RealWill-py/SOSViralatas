@@ -62,15 +62,15 @@
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
         
         // ---------------------------------------------
-        // Inicialização do Firebase - CREDENCIAIS INSERIDAS
+        // Inicialização do Firebase - SUBSTITUA AQUI!
         // ---------------------------------------------
         const firebaseConfig = {
-            apiKey: "AIzaSyAduY_UYK-3hFzP-Qj4FcYHXTGpkt3VrgE", 
-            authDomain: "webapp-14c33.firebaseapp.com",
-            projectId: "webapp-14c33",
-            storageBucket: "webapp-14c33.appspot.com",
-            messagingSenderId: "975591091978",
-            appId: "1:975591091978:web:149e96a4760c268e7354f3"
+            apiKey: "SEU_API_KEY_AQUI", 
+            authDomain: "SEU_AUTHDOMAIN_AQUI",
+            projectId: "SEU_PROJECT_ID_AQUI",
+            storageBucket: "SEU_STORAGE_BUCKET_AQUI",
+            messagingSenderId: "SEU_MESSAGING_SENDER_ID_AQUI",
+            appId: "SEU_APP_ID_AQUI"
         };
         
         // Inicializa o app e os serviços
@@ -373,6 +373,7 @@
 
             try {
                 // Tenta atualizar o campo site_views_count, adicionando 1.
+                // Firebase.FieldValue.increment não existe no módulo importado. 
                 // Fazemos a leitura, incremento manual, e escrita (é atômico, mas requer regras de segurança adequadas).
                 
                 const snap = await getDoc(statusDocRef);
@@ -839,7 +840,6 @@
 </head>
 <body class="min-h-screen">
 
-    <!-- Header Fixo -->
     <header id="main-header" class="sticky top-0 z-40 shadow-md bg-white dark:bg-gray-900 border-b border-rose-100 dark:border-rose-900">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center relative">
             <h1 class="text-3xl font-extrabold text-rose-500 flex items-center space-x-2">
@@ -859,10 +859,8 @@
 
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-        <!-- Seção Pública (Padrão) -->
         <section id="public-section" class="space-y-12">
             
-            <!-- Apresentação -->
             <div class="text-center py-10 bg-rose-50 dark:bg-gray-800 rounded-3xl shadow-xl border border-rose-200 dark:border-gray-700">
                 <h2 class="text-4xl md:text-5xl font-extrabold text-sky-600 dark:text-sky-400 mb-4">
                     Amor Resgata. Amor Acolhe.
@@ -872,38 +870,30 @@
                 </p>
             </div>
 
-            <!-- Nossos Números -->
             <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Nossos Números</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
-                <!-- Resgatados -->
                 <div class="bg-rose-50 dark:bg-rose-950 p-6 rounded-2xl text-center shadow-lg border border-rose-200 dark:border-rose-800">
                     <p class="text-4xl font-extrabold text-rose-600 dark:text-rose-400" id="resgatados-count">0</p>
                     <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Resgatados</p>
                 </div>
-                <!-- Adotados -->
                 <div class="bg-rose-50 dark:bg-rose-950 p-6 rounded-2xl text-center shadow-lg border border-rose-200 dark:border-rose-800">
                     <p class="text-4xl font-extrabold text-rose-600 dark:text-rose-400" id="adotados-count">0</p>
                     <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Adotados</p>
                 </div>
-                <!-- Aguardando Adoções -->
                 <div class="bg-sky-50 dark:bg-sky-950 p-6 rounded-2xl text-center shadow-lg border border-sky-200 dark:border-sky-800">
                     <p class="text-4xl font-extrabold text-sky-600 dark:text-sky-400" id="adocao-count">0</p>
                     <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Aguardando Adoções</p>
                 </div>
-                <!-- Visitas -->
                 <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-2xl text-center shadow-lg border border-gray-200 dark:border-gray-600">
                     <p class="text-4xl font-extrabold text-gray-600 dark:text-gray-300" id="site-views-count">0</p>
                     <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Visitas ao Site</p>
                 </div>
             </div>
 
-            <!-- Animais para Adoção -->
             <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Nossos Amigos</h3>
             <div id="animals-list-public" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-                <!-- Cards dos animais serão injetados aqui -->
-            </div>
+                </div>
 
-            <!-- Contato -->
             <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Entre em Contato</h3>
             <div class="bg-sky-50 dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-sky-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
                 <div>
@@ -932,7 +922,6 @@
 
         </section>
 
-        <!-- Seção Login (Escondida por padrão) -->
         <section id="login-section" class="hidden max-w-lg mx-auto py-20">
             <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-sky-100 dark:border-sky-800">
                 <h2 class="text-3xl font-bold text-sky-600 dark:text-sky-400 mb-6 text-center">Login Administrativo (Firebase)</h2>
@@ -955,14 +944,12 @@
             </div>
         </section>
 
-        <!-- Seção Admin (Escondida por padrão) -->
         <section id="admin-section" class="hidden">
             <h2 class="text-4xl font-extrabold text-sky-600 dark:text-sky-400 mb-8 flex justify-between items-center">
                 Painel Administrativo
                 <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Usuário ID: <span id="current-user-id">Carregando...</span></span>
             </h2>
 
-            <!-- Navegação Admin -->
             <div id="admin-nav" class="flex space-x-2 mb-8 p-2 rounded-xl bg-gray-100 dark:bg-gray-700 shadow-inner">
                 <button data-view="dashboard" class="flex-1 p-3 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white">
                     <i data-lucide="layout-dashboard" class="w-5 h-5 inline mr-2"></i> Dashboard
@@ -975,13 +962,10 @@
                 </button>
             </div>
 
-            <!-- Bloco: Dashboard -->
             <div id="admin-dashboard-block" class="space-y-8">
                 <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Visão Geral</h3>
                 
-                <!-- Indicadores do Topo -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <!-- Animais Disponíveis -->
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-rose-100 dark:border-rose-900 flex items-center justify-between">
                         <div>
                             <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Em Adoção</p>
@@ -989,7 +973,6 @@
                         </div>
                         <i data-lucide="list-checks" class="w-8 h-8 text-rose-300"></i>
                     </div>
-                    <!-- Interessados (Novo) -->
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-sky-100 dark:border-sky-800 flex items-center justify-between">
                         <div>
                             <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Interessados</p>
@@ -997,7 +980,6 @@
                         </div>
                         <i data-lucide="message-circle-heart" class="w-8 h-8 text-sky-300"></i>
                     </div>
-                    <!-- Views -->
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 flex items-center justify-between">
                         <div>
                             <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Visitas</p>
@@ -1005,7 +987,6 @@
                         </div>
                         <i data-lucide="eye" class="w-8 h-8 text-gray-400"></i>
                     </div>
-                    <!-- Adotados Geral -->
                     <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-rose-100 dark:border-rose-900 flex items-center justify-between">
                         <div>
                             <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Total Adotados</p>
@@ -1015,14 +996,11 @@
                     </div>
                 </div>
 
-                <!-- Lista de Interessados -->
                 <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 pt-6">Interesses de Adoção Recentes (Firebase)</h3>
                 <ul id="adoption-interests-list" class="space-y-4">
-                    <!-- Lista de Interessados será injetada aqui -->
-                </ul>
+                    </ul>
             </div>
 
-            <!-- Bloco: Animais -->
             <div id="admin-animals-block" class="hidden space-y-8">
                 <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex justify-between items-center">
                     Gerenciar Animais
@@ -1032,15 +1010,12 @@
                     </button>
                 </h3>
                 <ul id="animals-list-admin" class="space-y-4">
-                    <!-- Lista de CRUD de animais será injetada aqui -->
-                </ul>
+                    </ul>
             </div>
 
-            <!-- Bloco: Configurações -->
             <div id="admin-config-block" class="hidden space-y-8">
                 <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Ajustes da Aplicação</h3>
 
-                <!-- Contadores Gerenciados -->
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-sky-100 dark:border-sky-800">
                     <h4 class="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">Contadores de Resgate e Adoção</h4>
                     <form id="managed-counters-form" class="space-y-4">
@@ -1066,7 +1041,6 @@
                     </form>
                 </div>
 
-                <!-- Configurações Globais (Contatos e Texto) -->
                 <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-sky-100 dark:border-sky-800">
                     <h4 class="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">Informações Públicas e Contato</h4>
                     <form id="global-config-form" class="space-y-4">
@@ -1107,7 +1081,6 @@
     </main>
 
 
-    <!-- MODAL GLOBAL (Notificações) -->
     <div id="global-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform duration-300 border-t-4 border-rose-500 dark:border-rose-400">
             <h3 id="modal-title" class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-3">Título</h3>
@@ -1118,7 +1091,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE CONFIRMAÇÃO (Sim/Não) -->
     <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform duration-300 border-t-4 border-sky-500 dark:border-sky-400">
             <h3 id="confirm-modal-title" class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-3">Confirmar</h3>
@@ -1130,7 +1102,6 @@
         </div>
     </div>
 
-    <!-- MODAL DE FORMULÁRIO DE ANIMAL (CRUD) -->
     <div id="animal-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300 overflow-y-auto">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg p-6 my-10 transform transition-transform duration-300 border-t-4 border-rose-500 dark:border-rose-400">
             <div class="flex justify-between items-center mb-6">
@@ -1178,7 +1149,6 @@
         </div>
     </div>
     
-    <!-- MODAL DE FORMULÁRIO DE INTERESSE EM ADOÇÃO -->
     <div id="adoption-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300 overflow-y-auto">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6 my-10 transform transition-transform duration-300 border-t-4 border-sky-500 dark:border-sky-400">
             <div class="flex justify-between items-center mb-6">
