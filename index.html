@@ -1,818 +1,1220 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { LucideHeart, LucidePawPrint, LucideUser, LucideX, LucideTrash2, LucideEdit, LucidePlus, LucideCheckCircle, LucideGlobe } from 'lucide-react';
-// A importação do ficheiro './index.css' foi removida para resolver o erro de compilação.
-// Todos os estilos são aplicados diretamente com classes Tailwind CSS.
-
-// --- MOCK API (Simulação de Conexão com PostgreSQL) ---
-// Este código simula a persistência de dados em um banco de dados real (como PostgreSQL).
-// Para migrar, esta seção (e as chamadas a ela) precisará ser substituída por requisições HTTP reais (fetch) para o seu servidor.
-
-const STORAGE_KEY = 'sos_viralatas_data';
-
-const getMockData = () => {
-    try {
-        const storedData = localStorage.getItem(STORAGE_KEY);
-        return storedData ? JSON.parse(storedData) : {
-            animals: [
-                { id: '1', name: 'Max', type: 'Cão', breed: 'Pastor Alemão', age: 3, gender: 'Macho', status: 'Disponível', description: 'Max é um cão energético e muito leal, ideal para famílias ativas. Adora correr e brincar com bolas.', photos: ['https://placehold.co/400x300/60a5fa/ffffff?text=Max'] },
-                { id: '2', name: 'Luna', type: 'Gato', breed: 'Siamês', age: 1, gender: 'Fêmea', status: 'Disponível', description: 'Luna é uma gata calma e meiga, perfeita para quem procura uma companhia tranquila. É muito curiosa.', photos: ['https://placehold.co/400x300/f87171/ffffff?text=Luna'] },
-                { id: '3', name: 'Kiko', type: 'Cão', breed: 'Vira-Lata', age: 5, gender: 'Macho', status: 'Em Processo', description: 'Kiko é o mais novo resgatado, precisa de um lar paciente e com muito amor. Já está em processo de adaptação.', photos: ['https://placehold.co/400x300/34d399/ffffff?text=Kiko'] },
-            ],
-            adoptionInterests: [
-                { id: 'a1', animalId: '1', animalNome: 'Max', nome: 'João Silva', telefone: '912345678', email: 'joao@mail.com', message: 'Tenho um grande quintal e adoro cães grandes.', date: new Date().toISOString(), status: 'Pendente' }
-            ],
-            config: {
-                project_name: 'S.O.S Viralatas',
-                slogan: 'Ajudando a encontrar um lar de amor.',
-                contact_email: 'contato@seusos.org',
-                contact_phone: '(XX) 9XXXX-XXXX',
-                about_text: 'Somos uma organização dedicada a resgatar e reabilitar cães e gatos em situação de rua. Nosso objetivo é encontrar lares seguros e amorosos para todos os nossos resgatados.',
-            },
-        };
-    } catch (e) {
-        console.error("Erro ao carregar dados do localStorage:", e);
-        return { animals: [], adoptionInterests: [], config: {} };
-    }
-};
-
-const saveMockData = (data) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-};
-
-const mockApi = {
-    // Busca todos os dados necessários para o estado inicial
-    fetchInitialData: () => new Promise(resolve => {
-        setTimeout(() => resolve(getMockData()), 200);
-    }),
-
-    // --- Animais (CRUD do Admin) ---
-    addAnimal: (animal) => new Promise(resolve => {
-        const data = getMockData();
-        const newAnimal = { 
-            ...animal, 
-            id: Date.now().toString(), 
-            status: animal.status || 'Disponível',
-            photos: animal.photos.filter(Boolean) || ['https://placehold.co/400x300/a8a29e/ffffff?text=SEM+FOTO'], // Placeholder
-        };
-        data.animals.push(newAnimal);
-        saveMockData(data);
-        setTimeout(() => resolve(newAnimal), 200);
-    }),
-
-    updateAnimal: (updatedAnimal) => new Promise(resolve => {
-        const data = getMockData();
-        const index = data.animals.findIndex(a => a.id === updatedAnimal.id);
-        if (index !== -1) {
-            data.animals[index] = { ...updatedAnimal, photos: updatedAnimal.photos.filter(Boolean) };
-            saveMockData(data);
-            setTimeout(() => resolve(data.animals[index]), 200);
-        } else {
-            setTimeout(() => resolve(null), 200);
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S.O.S Viralatas by Andrea | Resgate e Adoção Premium (Firebase)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.4s, color 0.4s;
         }
-    }),
-
-    deleteAnimal: (id) => new Promise(resolve => {
-        const data = getMockData();
-        const initialLength = data.animals.length;
-        data.animals = data.animals.filter(a => a.id !== id);
-        saveMockData(data);
-        setTimeout(() => resolve(data.animals.length < initialLength), 200);
-    }),
-
-    // --- Interesses de Adoção (Escrita Pública) ---
-    addInterest: (interest) => new Promise(resolve => {
-        const data = getMockData();
-        const newInterest = { 
-            ...interest, 
-            id: Date.now().toString(), 
-            date: new Date().toISOString(),
-            status: 'Pendente'
-        };
-        data.adoptionInterests.push(newInterest);
-        saveMockData(data);
-        setTimeout(() => resolve(newInterest), 200);
-    }),
-
-    // --- Interesses de Adoção (Leitura/Atualização do Admin) ---
-    updateInterestStatus: (id, status) => new Promise(resolve => {
-        const data = getMockData();
-        const interest = data.adoptionInterests.find(i => i.id === id);
-        if (interest) {
-            interest.status = status;
-            saveMockData(data);
-            setTimeout(() => resolve(interest), 200);
-        } else {
-            setTimeout(() => resolve(null), 200);
+        /* Nova Paleta e Estilos */
+        .dark body {
+            background-color: #1f2937; 
+            color: #f3f4f6; 
         }
-    })
-};
-// --- FIM MOCK API ---
-
-
-// Contexto de Estado Global
-const AppContext = React.createContext();
-
-// Componente Principal da Aplicação
-const App = () => {
-    const [page, setPage] = useState('home'); // 'home', 'admin', 'login'
-    const [animals, setAnimals] = useState([]);
-    const [interests, setInterests] = useState([]);
-    const [config, setConfig] = useState({});
-    const [isLoading, setIsLoading] = useState(true);
-    const [isAdmin, setIsAdmin] = useState(false); // Simulação de estado de login
-    const [modalMessage, setModalMessage] = useState({ show: false, text: '', type: 'success' }); // Para mensagens de notificação
-
-    // Função para mostrar notificações
-    const showMessage = (text, type = 'success') => {
-        setModalMessage({ show: true, text, type });
-        setTimeout(() => setModalMessage({ show: false, text: '', type: 'success' }), 4000);
-    };
-
-    // Simulação de login
-    const handleLogin = (email, password) => {
-        setIsLoading(true);
-        // Em um sistema real, você chamaria sua API de autenticação.
-        // Aqui, aceitamos credenciais fixas para fins de demonstração.
-        if (email === 'admin@sosviralatas.com' && password === 'admin123') {
-            setTimeout(() => {
-                setIsAdmin(true);
-                setPage('admin');
-                setIsLoading(false);
-                showMessage('Login bem-sucedido!', 'success');
-            }, 500);
-            return true;
-        } else {
-            setTimeout(() => {
-                setIsLoading(false);
-                showMessage('Credenciais inválidas. Use o Admin Mock.', 'error');
-            }, 500);
-            return false;
+        .light body {
+            background-color: #f9fafb; 
+            color: #111827; 
         }
-    };
-
-    const handleLogout = () => {
-        setIsAdmin(false);
-        setPage('home');
-        showMessage('Sessão encerrada.', 'success');
-    };
-
-    // Carregamento inicial de dados
-    useEffect(() => {
-        const loadData = async () => {
-            const data = await mockApi.fetchInitialData();
-            setAnimals(data.animals);
-            setInterests(data.adoptionInterests);
-            setConfig(data.config);
-            setIsLoading(false);
-        };
-        loadData();
-    }, []);
-
-    // Ações de gerenciamento de animais
-    const animalActions = useMemo(() => ({
-        add: async (animal) => {
-            const newAnimal = await mockApi.addAnimal(animal);
-            setAnimals(prev => [...prev, newAnimal]);
-            showMessage(`Animal "${newAnimal.name}" adicionado com sucesso!`, 'success');
-            return true;
-        },
-        update: async (animal) => {
-            const updatedAnimal = await mockApi.updateAnimal(animal);
-            if (updatedAnimal) {
-                setAnimals(prev => prev.map(a => a.id === updatedAnimal.id ? updatedAnimal : a));
-                showMessage(`Animal "${updatedAnimal.name}" atualizado com sucesso!`, 'success');
-                return true;
+        .input-style {
+            transition: border-color 0.3s, box-shadow 0.3s;
+            border-radius: 0.5rem; 
+        }
+        .input-style:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(251, 113, 133, 0.5); 
+        }
+        .cat-dog-animation {
+            position: absolute;
+            top: 50%;
+            height: 60px; 
+            font-size: 48px; 
+            white-space: nowrap;
+            animation: move-across-reverse 4s linear forwards;
+            transform: translateY(-50%) translateX(100%); 
+            z-index: 50; 
+        }
+        @keyframes move-across-reverse {
+            0% {
+                transform: translateY(-50%) translateX(100vw); 
             }
-            showMessage('Erro ao atualizar animal.', 'error');
-            return false;
-        },
-        delete: async (id) => {
-            const success = await mockApi.deleteAnimal(id);
-            if (success) {
-                setAnimals(prev => prev.filter(a => a.id !== id));
-                showMessage('Animal excluído com sucesso.', 'success');
-            } else {
-                showMessage('Erro ao excluir animal.', 'error');
+            100% {
+                transform: translateY(-50%) translateX(-100%); 
             }
-            return success;
-        },
-    }), []);
-
-    // Ações de interesse de adoção
-    const interestActions = useMemo(() => ({
-        add: async (interest) => {
-            const newInterest = await mockApi.addInterest(interest);
-            setInterests(prev => [...prev, newInterest]);
-            return true;
-        },
-        updateStatus: async (id, status) => {
-            const updatedInterest = await mockApi.updateInterestStatus(id, status);
-            if (updatedInterest) {
-                setInterests(prev => prev.map(i => i.id === updatedInterest.id ? updatedInterest : i));
-                showMessage(`Status do interesse atualizado para "${status}".`, 'success');
-                return true;
-            }
-            showMessage('Erro ao atualizar status do interesse.', 'error');
-            return false;
-        },
-    }), []);
-
-
-    if (isLoading) {
-        return <LoadingScreen />;
-    }
-
-    return (
-        <AppContext.Provider value={{ animals, interests, config, setPage, isAdmin, handleLogin, handleLogout, animalActions, interestActions, showMessage }}>
-            <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-                <Header />
-                <main className="flex-grow container mx-auto p-4 md:p-8">
-                    {page === 'home' && <AnimalListing />}
-                    {page === 'login' && <LoginScreen />}
-                    {page === 'admin' && <AdminDashboard />}
-                </main>
-                <Footer />
-                <NotificationToast message={modalMessage} />
-            </div>
-        </AppContext.Provider>
-    );
-};
-export default App;
-
-
-// --- COMPONENTES AUXILIARES ---
-
-// Toast de Notificação
-const NotificationToast = ({ message }) => {
-    if (!message.show) return null;
-
-    const baseClass = "fixed bottom-5 right-5 p-4 rounded-xl shadow-xl flex items-center space-x-3 z-50 transition-transform duration-300 transform";
-    const successClass = "bg-green-500 text-white";
-    const errorClass = "bg-red-500 text-white";
-
-    return (
-        <div className={`${baseClass} ${message.type === 'success' ? successClass : errorClass}`}>
-            {message.type === 'success' ? <LucideCheckCircle className="w-6 h-6" /> : <LucideX className="w-6 h-6" />}
-            <p className="font-semibold">{message.text}</p>
-        </div>
-    );
-};
-
-
-// Tela de Carregamento
-const LoadingScreen = () => (
-    <div className="fixed inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="text-center p-8 bg-white rounded-xl shadow-2xl">
-            <LucidePawPrint className="animate-bounce w-10 h-10 text-indigo-600 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-gray-700">A carregar dados...</p>
-        </div>
-    </div>
-);
-
-// Cabeçalho e Navegação
-const Header = () => {
-    const { config, setPage, isAdmin, handleLogout } = React.useContext(AppContext);
-
-    return (
-        <header className="bg-white shadow-lg sticky top-0 z-10 border-b border-gray-100">
-            <div className="container mx-auto px-4 md:px-8 py-3 flex justify-between items-center">
-                <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setPage('home')}>
-                    <LucideHeart className="w-8 h-8 text-pink-600 animate-pulse" />
-                    <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">{config.project_name || 'S.O.S. Pets'}</h1>
-                </div>
-                
-                <nav className="flex items-center space-x-4">
-                    <button 
-                        onClick={() => setPage('home')} 
-                        className="text-gray-600 hover:text-indigo-600 font-medium transition duration-150 hidden sm:inline px-3 py-1 rounded-lg hover:bg-indigo-50"
-                    >
-                        Adoção
-                    </button>
-                    
-                    {isAdmin ? (
-                        <>
-                            <button 
-                                onClick={() => setPage('admin')} 
-                                className="flex items-center space-x-1 px-3 py-1.5 rounded-full bg-indigo-500 hover:bg-indigo-600 text-white transition duration-150 text-sm font-semibold shadow-md shadow-indigo-200"
-                            >
-                                <LucideUser className="w-4 h-4" />
-                                <span>Admin</span>
-                            </button>
-                            <button 
-                                onClick={handleLogout} 
-                                className="text-red-500 hover:text-red-700 transition duration-150 text-sm px-3 py-1 rounded-lg hover:bg-red-50"
-                            >
-                                Sair
-                            </button>
-                        </>
-                    ) : (
-                        <button 
-                            onClick={() => setPage('login')} 
-                            className="flex items-center space-x-1 text-gray-600 hover:text-indigo-600 font-medium transition duration-150 px-3 py-1 rounded-lg hover:bg-indigo-50"
-                        >
-                            <LucideUser className="w-5 h-5" />
-                            <span className='hidden sm:inline'>Login</span>
-                        </button>
-                    )}
-                </nav>
-            </div>
-        </header>
-    );
-};
-
-// Rodapé
-const Footer = () => {
-    const { config } = React.useContext(AppContext);
-    return (
-        <footer className="bg-gray-800 text-white p-6 mt-10">
-            <div className="container mx-auto text-center text-sm">
-                <p>&copy; {new Date().getFullYear()} {config.project_name}. Todos os direitos reservados.</p>
-                <p className="mt-1">Contacto: <a href={`mailto:${config.contact_email}`} className="text-indigo-300 hover:text-indigo-100">{config.contact_email}</a> | Telefone: {config.contact_phone}</p>
-            </div>
-        </footer>
-    );
-};
-
-
-// --- TELAS / ROTAS ---
-
-// 1. Listagem de Animais (Página Home)
-const AnimalListing = () => {
-    const { animals, config } = React.useContext(AppContext);
-    const availableAnimals = animals.filter(a => a.status === 'Disponível');
-
-    return (
-        <section className="space-y-12">
-            <div className="text-center p-8 bg-indigo-50 rounded-xl shadow-inner">
-                <h2 className="text-4xl font-extrabold text-indigo-900">{config.slogan}</h2>
-                <p className="mt-4 text-lg text-gray-700 max-w-3xl mx-auto">{config.about_text}</p>
-            </div>
-
-            <h3 className="text-3xl font-bold text-gray-800 border-b-4 border-pink-500 pb-2 mb-6">
-                Amigos à Espera ({availableAnimals.length})
-            </h3>
-            
-            {availableAnimals.length === 0 ? (
-                <div className="text-center p-10 bg-white rounded-xl shadow-md border border-gray-200">
-                    <LucidePawPrint className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-xl font-semibold text-gray-500">
-                        No momento, não temos amiguinhos disponíveis para adoção. Volte em breve!
-                    </p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                    {availableAnimals.map(animal => (
-                        <AnimalCard key={animal.id} animal={animal} />
-                    ))}
-                </div>
-            )}
-        </section>
-    );
-};
-
-// Cartão de Animal
-const AnimalCard = ({ animal }) => {
-    const { interestActions, showMessage } = React.useContext(AppContext);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [formState, setFormState] = useState({ 
-        nome: '', telefone: '', email: '', message: '', animalId: animal.id, animalNome: animal.name 
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-
-        if (!formState.nome || !formState.telefone) {
-            showMessage('Por favor, preencha seu nome e telefone.', 'error');
-            setIsSubmitting(false);
-            return;
         }
+    </style>
+    <script type="module" src="https://unpkg.com/lucide@latest"></script>
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>💖</text></svg>">
+    
+    <script type="module">
+        
+        // =======================================================
+        // 🚨 CONFIGURAÇÃO E BIBLIOTECAS DO FIREBASE
+        // =======================================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+        import { getFirestore, collection, getDocs, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+        
+        // ---------------------------------------------
+        // Inicialização do Firebase - CREDENCIAIS INSERIDAS
+        // ---------------------------------------------
+        const firebaseConfig = {
+            apiKey: "AIzaSyAduY_UYK-3hFzP-Qj4FcYHXTGpkt3VrgE", 
+            authDomain: "webapp-14c33.firebaseapp.com",
+            projectId: "webapp-14c33",
+            storageBucket: "webapp-14c33.appspot.com",
+            messagingSenderId: "975591091978",
+            appId: "1:975591091978:web:149e96a4760c268e7354f3"
+        };
+        
+        // Inicializa o app e os serviços
+        let app, db, auth;
+        let isAdminLoggedIn = false;
+        let currentUserId = null;
 
         try {
-            await interestActions.add(formState);
-            showMessage('Obrigado! Seu interesse foi registrado. Entraremos em contacto em breve.', 'success');
-            setFormState({ nome: '', telefone: '', email: '', message: '', animalId: animal.id, animalNome: animal.name }); // Limpa o form
-            setTimeout(() => setIsModalOpen(false), 300);
-        } catch (error) {
-            console.error("Erro ao registar interesse:", error);
-            showMessage('Erro ao enviar. Tente novamente mais tarde.', 'error');
-        } finally {
-            setIsSubmitting(false);
+            app = initializeApp(firebaseConfig);
+            db = getFirestore(app);
+            auth = getAuth(app);
+            console.log("Firebase inicializado com sucesso.");
+        } catch(e) {
+            console.error("Erro ao inicializar Firebase. Verifique suas credenciais e a importação dos módulos:", e);
         }
-    };
 
-    return (
-        <div className="bg-white rounded-xl shadow-lg overflow-hidden transform hover:shadow-2xl transition duration-300 border border-gray-100">
-            <div className="h-48 overflow-hidden">
-                <img 
-                    src={animal.photos[0]} 
-                    alt={animal.name} 
-                    className="w-full h-full object-cover transition-transform duration-300 hover:scale-105" 
-                    onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/400x300/a8a29e/ffffff?text=FOTO+INDISPON%C3%8DVEL" }}
-                />
-            </div>
-            <div className="p-4 space-y-3">
-                <h4 className="text-2xl font-bold text-gray-900">{animal.name}</h4>
-                <p className="text-sm text-gray-600 line-clamp-2 min-h-[40px]">{animal.description}</p>
+        // Coleções do Firestore
+        const COLLECTIONS = {
+            ANIMALS: 'animals',
+            STATUS: 'status', 
+            CONFIG: 'config', 
+            INTERESTS: 'adoptionInterests'
+        };
+
+        // Elementos da UI
+        const adminSection = document.getElementById('admin-section');
+        const publicSection = document.getElementById('public-section');
+        const loginSection = document.getElementById('login-section');
+        const animalsListPublic = document.getElementById('animals-list-public');
+        const presentationTextElement = document.getElementById('presentation-text');
+        const adminToggleBtn = document.getElementById('toggle-admin');
+        const themeToggleBtn = document.getElementById('theme-toggle');
+        const headerElement = document.getElementById('main-header'); 
+        const statusDocRef = doc(db, COLLECTIONS.STATUS, 'global');
+        const configDocRef = doc(db, COLLECTIONS.CONFIG, 'global');
+        
+        // Estado da Admin View
+        let currentAdminView = 'dashboard'; 
+        let appStatus = {};
+        let appConfig = {};
+        let interestsList = [];
+        
+        // Variável para o Easter Egg
+        let themeToggleClickCount = 0;
+        const EASTER_EGG_LIMIT = 13;
+
+
+        // =======================================================
+        // 1. AUTENTICAÇÃO E LÓGICA DE VISUALIZAÇÃO
+        // =======================================================
+
+        /** Verifica o estado da autenticação (Login) */
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // Usuário logado
+                isAdminLoggedIn = true;
+                currentUserId = user.uid;
+                if (loginSection.classList.contains('hidden') === false) {
+                   setView('admin'); // Vai para a área admin após login
+                }
+                document.getElementById('current-user-id').textContent = user.email || user.uid;
+            } else {
+                // Usuário deslogado
+                isAdminLoggedIn = false;
+                currentUserId = null;
+                // Se estava na admin, volta para a pública
+                if (adminSection.classList.contains('hidden') === false) {
+                    setView('public');
+                }
+                document.getElementById('current-user-id').textContent = 'Admin (Deslogado)';
+            }
+            // Garante que o estado correto seja exibido
+            if (!loginSection.classList.contains('hidden')) {
+                 adminToggleBtn.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
+            }
+            lucide.createIcons();
+        });
+
+
+        /** * Gerencia a visibilidade das seções principais
+         * @param {string} view 'public', 'login', ou 'admin'
+         */
+        function setView(view) {
+            publicSection.classList.add('hidden');
+            loginSection.classList.add('hidden');
+            adminSection.classList.add('hidden');
+
+            adminToggleBtn.classList.remove('bg-rose-400', 'text-gray-800', 'hover:bg-rose-500'); 
+            adminToggleBtn.classList.remove('bg-red-500', 'text-white', 'hover:bg-red-600');
+            
+            if (view === 'public') {
+                publicSection.classList.remove('hidden');
+                adminToggleBtn.innerHTML = '<i data-lucide="settings" class="w-6 h-6"></i>';
+                adminToggleBtn.classList.add('bg-rose-400', 'text-gray-800', 'hover:bg-rose-500'); 
+            } else {
+                adminToggleBtn.innerHTML = '<i data-lucide="x" class="w-6 h-6"></i>';
+                adminToggleBtn.classList.add('bg-red-500', 'text-white', 'hover:bg-red-600');
+
+                if (view === 'login') {
+                    loginSection.classList.remove('hidden');
+                } else if (view === 'admin' && isAdminLoggedIn) {
+                    adminSection.classList.remove('hidden');
+                    setAdminView(currentAdminView); 
+                    // Ouve as mudanças de dados ao entrar no admin
+                    startRealtimeListeners();
+                } else if (view === 'admin' && !isAdminLoggedIn) {
+                    setView('login'); // Se tentar ir para admin sem login, vai para login
+                }
+            }
+            lucide.createIcons();
+        }
+
+        /** * Gerencia a visibilidade dos blocos da área admin
+         * @param {string} view 'dashboard', 'animals', ou 'config'
+         */
+        function setAdminView(view) {
+            currentAdminView = view;
+            const views = {
+                dashboard: document.getElementById('admin-dashboard-block'),
+                animals: document.getElementById('admin-animals-block'),
+                config: document.getElementById('admin-config-block')
+            };
+
+            document.querySelectorAll('#admin-nav button').forEach(btn => {
+                if (btn.dataset.view === view) {
+                    btn.classList.add('bg-sky-500', 'text-white');
+                    btn.classList.remove('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200');
+                } else {
+                    btn.classList.remove('bg-sky-500', 'text-white');
+                    btn.classList.add('bg-gray-200', 'dark:bg-gray-700', 'text-gray-800', 'dark:text-gray-200');
+                }
+            });
+
+            for (const key in views) {
+                views[key].classList.add('hidden');
+            }
+            views[view].classList.remove('hidden');
+
+            // Ações específicas ao mudar de view
+            if (view === 'config') {
+                populateGlobalConfigForm();
+                populateManagedCountersForm();
+            }
+        }
+
+        // Listener para a navegação Admin
+        document.querySelectorAll('#admin-nav button').forEach(btn => {
+            btn.addEventListener('click', () => setAdminView(btn.dataset.view));
+        });
+
+        // Listener para alternar a visualização entre Público e Login/Admin
+        adminToggleBtn.addEventListener('click', () => {
+            if (publicSection.classList.contains('hidden') === false) {
+                setView('login'); // Abre a tela de login
+            } 
+            else {
+                if (isAdminLoggedIn) {
+                    handleLogout(); // Faz logout se já estiver logado
+                } else {
+                    setView('public'); // Volta para a tela pública
+                }
+            }
+        });
+
+        // Listener para login
+        document.getElementById('admin-login-form').addEventListener('submit', handleLogin);
+
+
+        /** Lida com o Login */
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = e.target.email.value;
+            const password = e.target.password.value;
+            const loginErrorMessage = document.getElementById('login-error-message');
+            loginErrorMessage.textContent = '';
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // onAuthStateChanged cuidará da transição para a view 'admin'
+                showModal("Bem-vindo, Andrea!", "Login de administração realizado com sucesso.");
+                e.target.reset(); 
+            } catch (error) {
+                console.error("Erro no login:", error);
+                loginErrorMessage.textContent = 'Erro no login: Credenciais inválidas ou o usuário não existe.';
+            }
+        }
+
+        /** Lida com o Logout */
+        async function handleLogout() {
+            try {
+                await signOut(auth);
+                // onAuthStateChanged cuidará da transição para a view 'public'
+                showModal("Sessão Encerrada", "Você saiu da área administrativa.");
+            } catch (error) {
+                console.error("Erro ao sair:", error);
+                showModal("Erro", "Não foi possível encerrar a sessão.");
+            }
+        }
+
+        /** Alterna entre modo escuro e claro E gerencia o Easter Egg */
+        themeToggleBtn.addEventListener('click', () => {
+            // 1. Lógica do Tema
+            document.documentElement.classList.toggle('dark');
+            const isDark = document.documentElement.classList.contains('dark');
+            themeToggleBtn.innerHTML = isDark 
+                ? '<i data-lucide="sun" class="w-6 h-6 text-rose-400"></i>' 
+                : '<i data-lucide="moon" class="w-6 h-6 text-gray-800"></i>';
+            lucide.createIcons();
+
+            // 2. Lógica do Easter Egg
+            themeToggleClickCount++;
+            if (themeToggleClickCount >= EASTER_EGG_LIMIT) {
+                themeToggleClickCount = 0; 
+                triggerEasterEgg();
+            }
+        });
+        
+        /** Ativa a animação do gato e do cão */
+        function triggerEasterEgg() {
+            if (!headerElement) return;
+            const animationElement = document.createElement('div');
+            animationElement.className = 'cat-dog-animation'; 
+            animationElement.innerHTML = '🐈🐕'; 
+            headerElement.appendChild(animationElement);
+            setTimeout(() => {
+                animationElement.remove();
+            }, 4100);
+        }
+
+        // =======================================================
+        // 2. SINCRONIZAÇÃO COM FIRESTORE (Realtime e Inicial)
+        // =======================================================
+        
+        /** Inicia todos os listeners de tempo real (Admin Dashboard) */
+        function startRealtimeListeners() {
+             // Listener para Status/Contadores e Texto de Apresentação (Global)
+            onSnapshot(statusDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    appStatus = docSnap.data();
+                    renderPublicStatus(); 
+                    renderAdminIndicators();
+                } else {
+                    console.log("Documento de Status Global não encontrado.");
+                }
+            });
+
+            // Listener para Interessados (Dashboard Admin)
+            const qInterests = query(collection(db, COLLECTIONS.INTERESTS), orderBy('dataSubmissao', 'desc'), limit(15));
+            onSnapshot(qInterests, (querySnapshot) => {
+                interestsList = [];
+                querySnapshot.forEach((doc) => {
+                    interestsList.push({ id: doc.id, ...doc.data() });
+                });
+                renderInterestsListAdmin(interestsList);
+                renderAdminIndicators(); // Para atualizar o contador
+            });
+            
+            // Listener para Animais (Público e Admin)
+            const qAnimals = query(collection(db, COLLECTIONS.ANIMALS), orderBy('dataCriacao', 'desc'));
+            onSnapshot(qAnimals, (querySnapshot) => {
+                let animals = [];
+                querySnapshot.forEach((doc) => {
+                    animals.push({ id: doc.id, ...doc.data() });
+                });
+                renderAnimals(animals, isAdminLoggedIn);
+            });
+        }
+
+
+        /** Carrega a configuração inicial (uma única vez) */
+        async function loadInitialData() {
+            try {
+                // 1. Carregar Configurações (Contatos e Links)
+                const configSnap = await getDoc(configDocRef);
+                if (configSnap.exists()) {
+                    appConfig = configSnap.data();
+                    renderPublicConfig();
+                } else {
+                    console.log("Documento de Configuração Global não encontrado.");
+                    // Cria um placeholder se não existir
+                    await setDoc(configDocRef, { 
+                        email: 'contato@sosviralatas.org', 
+                        telefone: '(XX) 9XXXX-XXXX', 
+                        instagram: '@sosviralatas', 
+                        mapsLink: 'http://maps.google.com/0' 
+                    });
+                }
                 
-                <div className="flex flex-wrap justify-between items-center text-sm pt-2 border-t border-gray-100">
-                    <span className="font-semibold text-indigo-600 flex items-center space-x-1">
-                        <LucidePawPrint className='w-4 h-4' />
-                        <span>{animal.type} ({animal.age} anos)</span>
-                    </span>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium shadow-sm ${animal.status === 'Disponível' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                        {animal.status}
-                    </span>
-                </div>
+                // 2. Incrementar e carregar Status/Views
+                await incrementSiteView();
                 
-                <button 
-                    onClick={() => setIsModalOpen(true)}
-                    className="w-full mt-3 py-2 bg-pink-600 text-white rounded-lg font-semibold hover:bg-pink-700 transition duration-150 flex items-center justify-center space-x-2 shadow-md shadow-pink-300"
-                >
-                    <LucideHeart className="w-5 h-5" />
-                    <span>Quero Adotar</span>
+            } catch(e) {
+                console.error("Erro ao carregar dados iniciais:", e);
+            }
+        }
+        
+        /** Incrementa o contador de visitas do site. */
+        async function incrementSiteView() {
+            if (isAdminLoggedIn) return; // Não conta a visualização do Admin logado
+
+            try {
+                // Tenta atualizar o campo site_views_count, adicionando 1.
+                // Fazemos a leitura, incremento manual, e escrita (é atômico, mas requer regras de segurança adequadas).
+                
+                const snap = await getDoc(statusDocRef);
+                let views = 0;
+                if (snap.exists() && snap.data().site_views_count) {
+                    views = snap.data().site_views_count;
+                }
+                
+                await setDoc(statusDocRef, { 
+                    site_views_count: views + 1, 
+                    // Preserva outros campos se existirem, ou define um default
+                    presentation_text: snap.exists() ? snap.data().presentation_text : 'Bem-vindos ao S.O.S Viralatas by Andrea! Nossa missão é dar uma segunda chance a cães e gatos resgatados, encontrando lares amorosos para eles.'
+                }, { merge: true });
+                
+            } catch (e) {
+                 console.error("Erro ao incrementar views. Verifique as regras de segurança do Firestore:", e);
+            }
+        }
+
+
+        // =======================================================
+        // 3. RENDERIZAÇÃO E ADMIN (Funções de UI)
+        // =======================================================
+
+        /** Renderiza o texto de apresentação e os contadores na página pública. */
+        function renderPublicStatus() {
+            presentationTextElement.textContent = appStatus.presentation_text || 'Carregando...';
+
+            document.getElementById('resgatados-count').textContent = appStatus.resgatados_count || 0;
+            document.getElementById('adotados-count').textContent = appStatus.adotados_count || 0;
+            document.getElementById('adocao-count').textContent = appStatus.aguardando_adocao_count || 0;
+            document.getElementById('site-views-count').textContent = appStatus.site_views_count || 0;
+        }
+
+        /** Renderiza os indicadores no topo do Painel Admin. */
+        function renderAdminIndicators() {
+            document.getElementById('admin-views-count').textContent = appStatus.site_views_count || 0;
+            // A contagem de animais disponíveis e a lista de interesses vêm dos listeners
+            document.getElementById('admin-available-animals').textContent = document.getElementById('animals-list-admin').children.length; 
+            document.getElementById('interests-count').textContent = interestsList.length; 
+            document.getElementById('adotados-count-dashboard').textContent = appStatus.adotados_count || 0;
+        }
+
+        /** Renderiza contatos e link do mapa na área pública. */
+        function renderPublicConfig() {
+            document.getElementById('public-email').textContent = appConfig.email || 'N/A';
+            document.getElementById('public-phone').textContent = appConfig.telefone || 'N/A';
+            document.getElementById('public-instagram').textContent = appConfig.instagram || 'N/A';
+            document.getElementById('public-maps-link').href = appConfig.mapsLink || '#';
+            document.getElementById('public-maps-link').target = '_blank';
+        }
+
+        /** Renderiza a lista de interessados na Dashboard Admin. */
+        function renderInterestsListAdmin(list) {
+            const container = document.getElementById('adoption-interests-list');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 p-4">Nenhum interessado registrado ainda. 💖</p>';
+                return;
+            }
+            
+            list.forEach(item => {
+                const itemDate = new Date(item.dataSubmissao).toLocaleDateString('pt-BR');
+                const listItem = document.createElement('li');
+                listItem.className = 'bg-white dark:bg-gray-700 p-4 rounded-lg shadow border border-sky-100 dark:border-sky-800 flex justify-between items-center mb-2';
+                listItem.innerHTML = `
+                    <div>
+                        <p class="font-bold text-lg text-rose-500">${item.nome} (${itemDate})</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">Animal: <span class="font-semibold">${item.animalNome}</span></p>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">📞 ${item.telefone}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">📧 ${item.email}</p>
+                    </div>
+                    <button data-id="${item.id}" data-action="delete-interest" class="delete-interest-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-colors flex items-center space-x-1 shadow-md">
+                        <i data-lucide="check" class="w-4 h-4"></i>
+                    </button>
+                `;
+                container.appendChild(listItem);
+            });
+            lucide.createIcons();
+        }
+
+        /** Renderiza as listas de animais na área pública e administrativa. */
+        function renderAnimals(animals, isAdminView) {
+            document.getElementById('animals-list-admin').innerHTML = '';
+            animalsListPublic.innerHTML = '';
+
+            if (animals.length === 0) {
+                animalsListPublic.innerHTML = '<p class="text-center text-gray-500 dark:text-gray-400 p-4">Nenhum animal resgatado cadastrado ainda. 🐾</p>';
+                document.getElementById('animals-list-admin').innerHTML = '<li class="text-gray-500 dark:text-gray-400 p-4">A lista está vazia. Adicione um novo animal acima!</li>';
+                return;
+            }
+
+            // Renderiza na Área Pública (Landing Page)
+            animals.slice(0, 6).forEach(animal => { // Mostra apenas os 6 mais recentes
+                const card = createAnimalCard(animal, false);
+                animalsListPublic.appendChild(card);
+            });
+
+            // Renderiza na Área Administrativa (Se logado)
+            if (isAdminView) {
+                animals.forEach(animal => {
+                    const listItem = createAnimalCard(animal, true);
+                    document.getElementById('animals-list-admin').appendChild(listItem);
+                });
+            }
+            renderAdminIndicators();
+        }
+
+        /** Cria o card/item de animal. */
+        function createAnimalCard(animal, isAdmin) {
+            const container = document.createElement(isAdmin ? 'li' : 'div');
+            container.className = isAdmin 
+                ? 'bg-white dark:bg-gray-800 p-4 rounded-xl shadow-lg flex flex-col md:flex-row items-center space-y-3 md:space-y-0 md:space-x-4 mb-4 transition-colors border border-gray-200 dark:border-gray-700' 
+                : 'bg-white dark:bg-gray-800 rounded-2xl shadow-2xl overflow-hidden transform hover:scale-[1.02] transition-all duration-300 border border-rose-100 dark:border-rose-900';
+            
+            const imageUrl = animal.imagemUrl && animal.imagemUrl.startsWith('http') 
+                ? animal.imagemUrl 
+                : `https://placehold.co/400x300/F472B6/FFFFFF?text=🐾+${animal.nome}`; /* Pink/Rose */
+
+            if (isAdmin) {
+                container.innerHTML = `
+                    <img src="${imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/64x64/F472B6/FFFFFF?text=🐾';" alt="Foto de ${animal.nome}" class="w-16 h-16 object-cover rounded-full flex-shrink-0 border-2 border-rose-400">
+                    <div class="flex-grow min-w-0">
+                        <h3 class="text-xl font-bold text-sky-600 dark:text-sky-400 truncate">${animal.nome}</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-300">${animal.raca} - ${animal.idade} ano(s)</p>
+                    </div>
+                    <div class="flex space-x-2 mt-3 md:mt-0 flex-shrink-0">
+                        <button data-id="${animal.id}" data-action="edit" class="edit-btn bg-sky-400 hover:bg-sky-500 text-gray-800 p-2 rounded-lg text-sm transition-colors flex items-center space-x-1 shadow-md">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                        </button>
+                        <button data-id="${animal.id}" data-action="delete" class="delete-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-lg text-sm transition-colors flex items-center space-x-1 shadow-md">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+                container.querySelector('.edit-btn').addEventListener('click', () => editAnimal(animal));
+                container.querySelector('.delete-btn').addEventListener('click', () => deleteAnimal(animal.id, animal.nome));
+            } else {
+                container.innerHTML = `
+                    <img src="${imageUrl}" onerror="this.onerror=null;this.src='https://placehold.co/400x300/F472B6/FFFFFF?text=S.O.S+Viralatas';" alt="Foto de ${animal.nome}" class="w-full h-48 object-cover">
+                    <div class="p-5">
+                        <h3 class="text-2xl font-extrabold text-gray-800 dark:text-gray-100">${animal.nome}</h3>
+                        <p class="text-sm text-rose-500 font-semibold mb-3">${animal.raca} - ${animal.idade} ano(s)</p>
+                        <p class="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-3">${animal.descricao}</p>
+                        <button data-id="${animal.id}" data-name="${animal.nome}" class="interest-btn w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg transition-colors shadow-lg flex items-center justify-center space-x-2">
+                            <i data-lucide="heart" class="w-5 h-5"></i>
+                            <span>Quero Adotar</span>
+                        </button>
+                    </div>
+                `;
+                container.querySelector('.interest-btn').addEventListener('click', (e) => {
+                    const id = e.currentTarget.dataset.id;
+                    const name = e.currentTarget.dataset.name;
+                    openAdoptionModal(id, name);
+                });
+            }
+            lucide.createIcons();
+            return container;
+        }
+
+        // =======================================================
+        // 4. CRUD DE ANIMAIS (Firestore)
+        // =======================================================
+        
+        let isEditing = false;
+        let currentAnimalId = null;
+
+        /** Abre o formulário para adicionar ou editar um animal. */
+        function openAnimalForm(animal = null) {
+            const form = document.getElementById('animal-form');
+            document.getElementById('animal-form-title').textContent = animal ? `Editar Animal: ${animal.nome}` : 'Adicionar Novo Animal';
+            isEditing = !!animal;
+            currentAnimalId = animal ? animal.id : null;
+            form.reset();
+
+            if (animal) {
+                form.nome.value = animal.nome || '';
+                form.raca.value = animal.raca || '';
+                form.idade.value = animal.idade || '';
+                form.sexo.value = animal.sexo || '';
+                form.imagemUrl.value = animal.imagemUrl || '';
+                form.descricao.value = animal.descricao || '';
+            }
+
+            document.getElementById('animal-modal').classList.remove('hidden');
+        }
+        
+        document.getElementById('add-animal-btn').addEventListener('click', () => openAnimalForm());
+        document.getElementById('animal-modal-close').addEventListener('click', () => {
+            document.getElementById('animal-modal').classList.add('hidden');
+        });
+
+        function editAnimal(animal) {
+            openAnimalForm(animal);
+        }
+
+        document.getElementById('animal-form').addEventListener('submit', handleSaveAnimal);
+
+        /** Salva ou atualiza um animal no Firestore. */
+        async function handleSaveAnimal(e) {
+            e.preventDefault();
+            if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+
+            const animalData = {
+                nome: e.target.nome.value.trim(),
+                raca: e.target.raca.value.trim(),
+                idade: parseInt(e.target.idade.value) || 0,
+                sexo: e.target.sexo.value,
+                imagemUrl: e.target.imagemUrl.value.trim(),
+                descricao: e.target.descricao.value.trim(),
+                dataCriacao: new Date().getTime() // Carimbo de data/hora atual (para ordenação)
+            };
+
+            const modal = document.getElementById('animal-modal');
+
+            try {
+                if (isEditing && currentAnimalId) {
+                    // Atualiza
+                    const animalRef = doc(db, COLLECTIONS.ANIMALS, currentAnimalId);
+                    await updateDoc(animalRef, animalData);
+                    showModal("Sucesso", `Animal ${animalData.nome} atualizado no Firebase!`);
+                } else {
+                    // Adiciona
+                    await addDoc(collection(db, COLLECTIONS.ANIMALS), animalData);
+                    showModal("Sucesso", `Animal ${animalData.nome} adicionado ao Firebase!`);
+                }
+                
+                modal.classList.add('hidden');
+                e.target.reset();
+            } catch (error) {
+                console.error("Erro ao salvar animal:", error);
+                showModal("Erro", "Falha ao salvar o animal. Verifique suas regras de segurança do Firestore.");
+            }
+        }
+
+        /** Deleta um animal do Firestore. */
+        async function deleteAnimal(id, nome) {
+            if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+
+            const isConfirmed = await showConfirmModal("Confirmar Exclusão", `Tem certeza que deseja remover o animal ${nome}? Esta ação é irreversível.`);
+            
+            if (!isConfirmed) return;
+
+            try {
+                const animalRef = doc(db, COLLECTIONS.ANIMALS, id);
+                await deleteDoc(animalRef);
+                showModal("Sucesso", `Animal ${nome} removido do Firebase!`);
+            } catch (error) {
+                console.error("Erro ao deletar animal:", error);
+                showModal("Erro", "Falha ao deletar o animal. Verifique suas regras de segurança do Firestore.");
+            }
+        }
+
+
+        // =======================================================
+        // 5. GERENCIAMENTO DE INTERESSES (Firestore)
+        // =======================================================
+
+        const adoptionInterestForm = document.getElementById('adoption-interest-form');
+
+        function openAdoptionModal(animalId, animalName) {
+            document.getElementById('interest-animal-name').textContent = animalName;
+            adoptionInterestForm.dataset.animalId = animalId;
+            adoptionInterestForm.dataset.animalName = animalName;
+            document.getElementById('adoption-modal').classList.remove('hidden');
+            document.getElementById('adoption-interest-error').textContent = '';
+        }
+
+        document.getElementById('adoption-modal-close').addEventListener('click', () => {
+            document.getElementById('adoption-modal').classList.add('hidden');
+            adoptionInterestForm.reset();
+        });
+
+        adoptionInterestForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const animalId = adoptionInterestForm.dataset.animalId;
+            const animalName = adoptionInterestForm.dataset.animalName;
+            
+            const data = {
+                nome: e.target.interestName.value.trim(),
+                telefone: e.target.interestPhone.value.trim(),
+                email: e.target.interestEmail.value.trim() || 'Não fornecido',
+                dataSubmissao: new Date().getTime(),
+                animalId: animalId,
+                animalNome: animalName,
+                status: 'pendente'
+            };
+            
+            const errorElement = document.getElementById('adoption-interest-error');
+            errorElement.textContent = '';
+
+            if (!data.nome || !data.telefone) {
+                errorElement.textContent = 'Nome e Telefone são campos obrigatórios.';
+                return;
+            }
+
+            try {
+                await addDoc(collection(db, COLLECTIONS.INTERESTS), data);
+                showModal("Obrigado!", `Seu interesse em ${animalName} foi registrado no Firebase! O Admin verá em breve.`);
+                document.getElementById('adoption-modal').classList.add('hidden');
+                adoptionInterestForm.reset();
+            } catch (error) {
+                 console.error("Erro ao registrar interesse:", error);
+                showModal("Erro", "Falha ao registrar interesse. Verifique suas regras de segurança do Firestore (escrita pública).");
+            }
+        });
+        
+        // Listener para deletar interesse (marcar como tratado)
+        document.getElementById('adoption-interests-list').addEventListener('click', async (e) => {
+            const btn = e.target.closest('.delete-interest-btn');
+            if (btn) {
+                 if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+                const id = btn.dataset.id;
+
+                const isConfirmed = await showConfirmModal("Marcar como Tratado", "Marcar este interesse como tratado e remover da lista? (Esta ação é irreversível)");
+                
+                if (!isConfirmed) return;
+
+                try {
+                    const interestRef = doc(db, COLLECTIONS.INTERESTS, id);
+                    await deleteDoc(interestRef);
+                    showModal("Sucesso", "Interesse removido do Firebase.");
+                } catch (error) {
+                    console.error("Erro ao deletar interesse:", error);
+                    showModal("Erro", "Falha ao remover interesse. Verifique suas regras de segurança do Firestore.");
+                }
+            }
+        });
+
+
+        // =======================================================
+        // 6. CONFIGURAÇÕES GLOBAIS E CONTADORES (Firestore)
+        // =======================================================
+
+        /** Popula o formulário de contadores gerenciados com dados atuais */
+        function populateManagedCountersForm() {
+            const form = document.getElementById('managed-counters-form');
+            if (form) {
+                form.querySelector('#resgatados').value = appStatus.resgatados_count || 0;
+                form.querySelector('#adotados').value = appStatus.adotados_count || 0;
+                form.querySelector('#aguardando').value = appStatus.aguardando_adocao_count || 0;
+            }
+        }
+
+        document.getElementById('managed-counters-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+
+            const data = {
+                resgatados_count: parseInt(e.target.resgatados.value) || 0,
+                adotados_count: parseInt(e.target.adotados.value) || 0,
+                aguardando_adocao_count: parseInt(e.target.aguardando.value) || 0,
+            };
+            
+            try {
+                await updateDoc(statusDocRef, data);
+                showModal("Sucesso", "Contadores de Resgate/Adoção atualizados no Firebase!");
+            } catch (error) {
+                console.error("Erro ao atualizar contadores:", error);
+                showModal("Erro", "Falha ao atualizar contadores. Verifique suas regras de segurança do Firestore.");
+            }
+        });
+
+        /** Popula o formulário de configurações globais com dados atuais */
+        function populateGlobalConfigForm() {
+            const form = document.getElementById('global-config-form');
+            if (form) {
+                form.querySelector('#contact-email').value = appConfig.email || '';
+                form.querySelector('#contact-phone').value = appConfig.telefone || '';
+                form.querySelector('#contact-instagram').value = appConfig.instagram || '';
+                form.querySelector('#maps-link').value = appConfig.mapsLink || '';
+                form.querySelector('#presentation-text-input').value = appStatus.presentation_text || '';
+            }
+        }
+
+        document.getElementById('global-config-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+             if (!isAdminLoggedIn) { showModal("Acesso Negado", "Você precisa estar logado como Admin."); return; }
+
+            const configData = {
+                email: e.target.querySelector('#contact-email').value.trim(),
+                telefone: e.target.querySelector('#contact-phone').value.trim(),
+                instagram: e.target.querySelector('#contact-instagram').value.trim(),
+                mapsLink: e.target.querySelector('#maps-link').value.trim()
+            };
+            
+            const statusData = {
+                presentation_text: e.target.querySelector('#presentation-text-input').value.trim()
+            };
+
+            try {
+                // Atualiza Config
+                await updateDoc(configDocRef, configData);
+                // Atualiza Status (Texto de Apresentação)
+                await updateDoc(statusDocRef, statusData);
+
+                showModal("Sucesso", "Configurações Globais atualizadas no Firebase!");
+            } catch (error) {
+                console.error("Erro ao atualizar configurações:", error);
+                showModal("Erro", "Falha ao atualizar configurações. Verifique suas regras de segurança do Firestore.");
+            }
+        });
+
+
+        // =======================================================
+        // 7. FUNÇÕES DE MODAL
+        // =======================================================
+
+        function showModal(title, message) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('global-modal').classList.remove('hidden');
+        }
+
+        document.getElementById('modal-close').addEventListener('click', () => {
+            document.getElementById('global-modal').classList.add('hidden');
+        });
+        
+        function showConfirmModal(title, message) {
+            return new Promise(resolve => {
+                const confirmModal = document.getElementById('confirm-modal');
+                const confirmTitle = document.getElementById('confirm-modal-title');
+                const confirmMessage = document.getElementById('confirm-modal-message');
+                const confirmYes = document.getElementById('confirm-yes');
+                const confirmNo = document.getElementById('confirm-no');
+
+                confirmTitle.textContent = title;
+                confirmMessage.textContent = message;
+                confirmModal.classList.remove('hidden');
+
+                const handleYes = () => {
+                    confirmModal.classList.add('hidden');
+                    confirmYes.removeEventListener('click', handleYes);
+                    confirmNo.removeEventListener('click', handleNo);
+                    resolve(true);
+                };
+
+                const handleNo = () => {
+                    confirmModal.classList.add('hidden');
+                    confirmYes.removeEventListener('click', handleYes);
+                    confirmNo.removeEventListener('click', handleNo);
+                    resolve(false);
+                };
+
+                confirmYes.addEventListener('click', handleYes);
+                confirmNo.addEventListener('click', handleNo);
+            });
+        }
+
+
+        // Chamar a função de inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            loadInitialData(); // Carrega dados iniciais e incrementa views
+            
+            // Inicia o listener de animais e interesses para o caso de já estar logado
+            startRealtimeListeners(); 
+            
+            // onAuthStateChanged cuidará da definição inicial da view ('public' ou 'admin')
+            // Se não estiver logado, a view será 'public' por padrão.
+        });
+    </script>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header Fixo -->
+    <header id="main-header" class="sticky top-0 z-40 shadow-md bg-white dark:bg-gray-900 border-b border-rose-100 dark:border-rose-900">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center relative">
+            <h1 class="text-3xl font-extrabold text-rose-500 flex items-center space-x-2">
+                <i data-lucide="paw-print" class="w-8 h-8"></i>
+                <span>S.O.S Viralatas</span>
+            </h1>
+            <div class="flex space-x-3 items-center">
+                <button id="theme-toggle" class="p-3 rounded-full transition-colors bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600">
+                    <i data-lucide="moon" class="w-6 h-6 text-gray-800"></i>
+                </button>
+                <button id="toggle-admin" class="p-3 rounded-full transition-colors bg-rose-400 text-gray-800 hover:bg-rose-500 shadow-lg">
+                    <i data-lucide="settings" class="w-6 h-6"></i>
                 </button>
             </div>
-
-            {/* Modal de Interesse de Adoção */}
-            {isModalOpen && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 z-50 backdrop-blur-sm">
-                    <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 space-y-4 transform transition-all duration-300 scale-100">
-                        <div className="flex justify-between items-center border-b pb-3">
-                            <h5 className="text-xl font-bold text-indigo-700">Interesse em Adotar: {animal.name}</h5>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-800 p-1 rounded-full hover:bg-gray-100">
-                                <LucideX className="w-6 h-6" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <input type="text" placeholder="Seu Nome Completo *" required 
-                                value={formState.nome} onChange={(e) => setFormState({...formState, nome: e.target.value})}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500 transition duration-150"
-                            />
-                            <input type="tel" placeholder="Telefone de Contacto *" required 
-                                value={formState.telefone} onChange={(e) => setFormState({...formState, telefone: e.target.value})}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500 transition duration-150"
-                            />
-                            <input type="email" placeholder="Email (Opcional)"
-                                value={formState.email} onChange={(e) => setFormState({...formState, email: e.target.value})}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500 transition duration-150"
-                            />
-                            <textarea placeholder="Fale um pouco sobre o lar que você pode oferecer (Opcional)" rows="3"
-                                value={formState.message} onChange={(e) => setFormState({...formState, message: e.target.value})}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500 transition duration-150"
-                            ></textarea>
-
-                            <button type="submit" disabled={isSubmitting}
-                                className="w-full py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 transition duration-150 shadow-md shadow-green-300"
-                            >
-                                {isSubmitting ? 'A enviar...' : 'Confirmar Interesse'}
-                            </button>
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
-    );
-};
+    </header>
 
-// 2. Tela de Login
-const LoginScreen = () => {
-    const { handleLogin, setPage } = React.useContext(AppContext);
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        handleLogin(email, password);
-    };
-
-    return (
-        <div className="flex items-center justify-center p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-8 space-y-6 border border-indigo-200">
-                <h2 className="text-3xl font-bold text-center text-indigo-700">Acesso Administrativo</h2>
-                <p className="text-sm text-center text-gray-500 bg-gray-50 p-3 rounded-lg border">
-                    Esta é a simulação do painel Admin.
-                    <br/>
-                    <span className="font-semibold text-red-500">Credenciais de Teste: admin@sosviralatas.com / admin123</span>
+        <!-- Seção Pública (Padrão) -->
+        <section id="public-section" class="space-y-12">
+            
+            <!-- Apresentação -->
+            <div class="text-center py-10 bg-rose-50 dark:bg-gray-800 rounded-3xl shadow-xl border border-rose-200 dark:border-gray-700">
+                <h2 class="text-4xl md:text-5xl font-extrabold text-sky-600 dark:text-sky-400 mb-4">
+                    Amor Resgata. Amor Acolhe.
+                </h2>
+                <p id="presentation-text" class="max-w-3xl mx-auto text-lg text-gray-700 dark:text-gray-300">
+                    Carregando texto de apresentação...
                 </p>
-                <form onSubmit={handleSubmit} className="space-y-5">
+            </div>
+
+            <!-- Nossos Números -->
+            <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Nossos Números</h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
+                <!-- Resgatados -->
+                <div class="bg-rose-50 dark:bg-rose-950 p-6 rounded-2xl text-center shadow-lg border border-rose-200 dark:border-rose-800">
+                    <p class="text-4xl font-extrabold text-rose-600 dark:text-rose-400" id="resgatados-count">0</p>
+                    <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Resgatados</p>
+                </div>
+                <!-- Adotados -->
+                <div class="bg-rose-50 dark:bg-rose-950 p-6 rounded-2xl text-center shadow-lg border border-rose-200 dark:border-rose-800">
+                    <p class="text-4xl font-extrabold text-rose-600 dark:text-rose-400" id="adotados-count">0</p>
+                    <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Adotados</p>
+                </div>
+                <!-- Aguardando Adoções -->
+                <div class="bg-sky-50 dark:bg-sky-950 p-6 rounded-2xl text-center shadow-lg border border-sky-200 dark:border-sky-800">
+                    <p class="text-4xl font-extrabold text-sky-600 dark:text-sky-400" id="adocao-count">0</p>
+                    <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Aguardando Adoções</p>
+                </div>
+                <!-- Visitas -->
+                <div class="bg-gray-50 dark:bg-gray-700 p-6 rounded-2xl text-center shadow-lg border border-gray-200 dark:border-gray-600">
+                    <p class="text-4xl font-extrabold text-gray-600 dark:text-gray-300" id="site-views-count">0</p>
+                    <p class="mt-2 text-sm font-semibold text-gray-600 dark:text-gray-300">Visitas ao Site</p>
+                </div>
+            </div>
+
+            <!-- Animais para Adoção -->
+            <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Nossos Amigos</h3>
+            <div id="animals-list-public" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+                <!-- Cards dos animais serão injetados aqui -->
+            </div>
+
+            <!-- Contato -->
+            <h3 class="text-3xl font-bold text-gray-800 dark:text-gray-100 mt-12 mb-6">Entre em Contato</h3>
+            <div class="bg-sky-50 dark:bg-gray-800 p-8 rounded-2xl shadow-xl border border-sky-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+                <div>
+                    <i data-lucide="mail" class="w-8 h-8 text-rose-500 mx-auto mb-2"></i>
+                    <p class="font-bold text-lg">Email</p>
+                    <p id="public-email" class="text-gray-700 dark:text-gray-300">Carregando...</p>
+                </div>
+                <div>
+                    <i data-lucide="phone" class="w-8 h-8 text-rose-500 mx-auto mb-2"></i>
+                    <p class="font-bold text-lg">Telefone</p>
+                    <p id="public-phone" class="text-gray-700 dark:text-gray-300">Carregando...</p>
+                </div>
+                <div>
+                    <i data-lucide="instagram" class="w-8 h-8 text-rose-500 mx-auto mb-2"></i>
+                    <p class="font-bold text-lg">Instagram</p>
+                    <p id="public-instagram" class="text-gray-700 dark:text-gray-300">Carregando...</p>
+                </div>
+            </div>
+            
+            <div class="text-center mt-8">
+                <a id="public-maps-link" href="#" target="_blank" class="inline-flex items-center bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 px-6 rounded-lg transition-colors shadow-lg space-x-2">
+                    <i data-lucide="map-pin" class="w-5 h-5"></i>
+                    <span>Ver Localização no Mapa</span>
+                </a>
+            </div>
+
+        </section>
+
+        <!-- Seção Login (Escondida por padrão) -->
+        <section id="login-section" class="hidden max-w-lg mx-auto py-20">
+            <div class="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl border border-sky-100 dark:border-sky-800">
+                <h2 class="text-3xl font-bold text-sky-600 dark:text-sky-400 mb-6 text-center">Login Administrativo (Firebase)</h2>
+                <form id="admin-login-form" class="space-y-6">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Email</label>
-                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        />
+                        <label for="email" class="block text-sm font-medium mb-1">Email</label>
+                        <input type="email" id="email" name="email" class="w-full p-3 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700">Senha</label>
-                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required
-                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        />
+                        <label for="password" class="block text-sm font-medium mb-1">Senha</label>
+                        <input type="password" id="password" name="password" class="w-full p-3 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
                     </div>
-                    <button type="submit"
-                        className="w-full py-2 px-4 bg-indigo-600 text-white font-semibold rounded-lg shadow-md hover:bg-indigo-700 transition duration-150"
-                    >
-                        Entrar
+
+                    <p id="login-error-message" class="text-red-500 text-sm font-semibold h-5"></p>
+                    <button type="submit" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg transition-colors shadow-md flex items-center justify-center space-x-2">
+                        <i data-lucide="log-in" class="w-5 h-5"></i>
+                        <span>Entrar</span>
                     </button>
                 </form>
-                <button onClick={() => setPage('home')} className="w-full text-sm text-gray-500 hover:text-indigo-600 mt-3 hover:underline">
-                    Voltar para o site
-                </button>
             </div>
-        </div>
-    );
-};
+        </section>
 
-// 3. Painel de Administração
-const AdminDashboard = () => {
-    const [activeTab, setActiveTab] = useState('animals'); // 'animals' ou 'interests'
-
-    return (
-        <section className="bg-white p-6 rounded-xl shadow-2xl border border-indigo-200">
-            <h2 className="text-3xl font-bold text-indigo-700 mb-6 flex items-center space-x-2">
-                <LucideUser className="w-7 h-7" />
-                <span>Painel de Administração</span>
+        <!-- Seção Admin (Escondida por padrão) -->
+        <section id="admin-section" class="hidden">
+            <h2 class="text-4xl font-extrabold text-sky-600 dark:text-sky-400 mb-8 flex justify-between items-center">
+                Painel Administrativo
+                <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Usuário ID: <span id="current-user-id">Carregando...</span></span>
             </h2>
 
-            <div className="flex border-b mb-6">
-                <button 
-                    onClick={() => setActiveTab('animals')}
-                    className={`px-4 py-2 font-semibold transition duration-150 ${activeTab === 'animals' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-indigo-500'}`}
-                >
-                    Gerir Animais
+            <!-- Navegação Admin -->
+            <div id="admin-nav" class="flex space-x-2 mb-8 p-2 rounded-xl bg-gray-100 dark:bg-gray-700 shadow-inner">
+                <button data-view="dashboard" class="flex-1 p-3 rounded-lg text-sm font-semibold transition-colors bg-sky-500 text-white">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5 inline mr-2"></i> Dashboard
                 </button>
-                <button 
-                    onClick={() => setActiveTab('interests')}
-                    className={`px-4 py-2 font-semibold transition duration-150 ${activeTab === 'interests' ? 'text-indigo-600 border-b-2 border-indigo-600' : 'text-gray-500 hover:text-indigo-500'}`}
-                >
-                    Interesses de Adoção
+                <button data-view="animals" class="flex-1 p-3 rounded-lg text-sm font-semibold transition-colors bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                    <i data-lucide="dog" class="w-5 h-5 inline mr-2"></i> Animais
+                </button>
+                <button data-view="config" class="flex-1 p-3 rounded-lg text-sm font-semibold transition-colors bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                    <i data-lucide="cog" class="w-5 h-5 inline mr-2"></i> Configurações
                 </button>
             </div>
 
-            {activeTab === 'animals' ? <AdminAnimals /> : <AdminInterests />}
+            <!-- Bloco: Dashboard -->
+            <div id="admin-dashboard-block" class="space-y-8">
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Visão Geral</h3>
+                
+                <!-- Indicadores do Topo -->
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Animais Disponíveis -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-rose-100 dark:border-rose-900 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Em Adoção</p>
+                            <p class="text-3xl font-bold text-rose-500" id="admin-available-animals">0</p>
+                        </div>
+                        <i data-lucide="list-checks" class="w-8 h-8 text-rose-300"></i>
+                    </div>
+                    <!-- Interessados (Novo) -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-sky-100 dark:border-sky-800 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Interessados</p>
+                            <p class="text-3xl font-bold text-sky-500" id="interests-count">0</p>
+                        </div>
+                        <i data-lucide="message-circle-heart" class="w-8 h-8 text-sky-300"></i>
+                    </div>
+                    <!-- Views -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Visitas</p>
+                            <p class="text-3xl font-bold text-gray-600 dark:text-gray-300" id="admin-views-count">0</p>
+                        </div>
+                        <i data-lucide="eye" class="w-8 h-8 text-gray-400"></i>
+                    </div>
+                    <!-- Adotados Geral -->
+                    <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-rose-100 dark:border-rose-900 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-semibold text-gray-500 dark:text-gray-400">Total Adotados</p>
+                            <p class="text-3xl font-bold text-rose-500" id="adotados-count-dashboard">0</p>
+                        </div>
+                        <i data-lucide="home" class="w-8 h-8 text-rose-300"></i>
+                    </div>
+                </div>
+
+                <!-- Lista de Interessados -->
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 pt-6">Interesses de Adoção Recentes (Firebase)</h3>
+                <ul id="adoption-interests-list" class="space-y-4">
+                    <!-- Lista de Interessados será injetada aqui -->
+                </ul>
+            </div>
+
+            <!-- Bloco: Animais -->
+            <div id="admin-animals-block" class="hidden space-y-8">
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 flex justify-between items-center">
+                    Gerenciar Animais
+                    <button id="add-animal-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-colors flex items-center space-x-2 shadow-md">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                        <span>Novo Animal</span>
+                    </button>
+                </h3>
+                <ul id="animals-list-admin" class="space-y-4">
+                    <!-- Lista de CRUD de animais será injetada aqui -->
+                </ul>
+            </div>
+
+            <!-- Bloco: Configurações -->
+            <div id="admin-config-block" class="hidden space-y-8">
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100">Ajustes da Aplicação</h3>
+
+                <!-- Contadores Gerenciados -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-sky-100 dark:border-sky-800">
+                    <h4 class="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">Contadores de Resgate e Adoção</h4>
+                    <form id="managed-counters-form" class="space-y-4">
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label for="resgatados" class="block text-sm font-medium mb-1">Total Resgatados</label>
+                                <input type="number" id="resgatados" name="resgatados" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                            <div>
+                                <label for="adotados" class="block text-sm font-medium mb-1">Total Adotados</label>
+                                <input type="number" id="adotados" name="adotados" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                            <div>
+                                <label for="aguardando" class="block text-sm font-medium mb-1">Aguardando Adoções</label>
+                                <input type="number" id="aguardando" name="aguardando" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                        </div>
+                        <div class="pt-4">
+                            <button type="submit" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md">
+                                Salvar Contadores no Firebase
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Configurações Globais (Contatos e Texto) -->
+                <div class="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-sky-100 dark:border-sky-800">
+                    <h4 class="text-xl font-semibold text-sky-600 dark:text-sky-400 mb-4">Informações Públicas e Contato</h4>
+                    <form id="global-config-form" class="space-y-4">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="contact-email" class="block text-sm font-medium mb-1">Email de Contato</label>
+                                <input type="email" id="contact-email" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                            <div>
+                                <label for="contact-phone" class="block text-sm font-medium mb-1">Telefone (Whatsapp)</label>
+                                <input type="text" id="contact-phone" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                            <div>
+                                <label for="contact-instagram" class="block text-sm font-medium mb-1">Instagram (@usuario)</label>
+                                <input type="text" id="contact-instagram" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                            <div>
+                                <label for="maps-link" class="block text-sm font-medium mb-1">Link do Google Maps</label>
+                                <input type="url" id="maps-link" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                            </div>
+                        </div>
+                        
+                        <div class="pt-2">
+                            <label for="presentation-text-input" class="block text-sm font-medium mb-1">Texto de Apresentação Principal</label>
+                            <textarea id="presentation-text-input" rows="3" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required></textarea>
+                        </div>
+                        
+                        <div class="pt-4">
+                            <button type="submit" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-md">
+                                Salvar Informações no Firebase
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
         </section>
-    );
-};
+    </main>
 
-// Subcomponente Admin: Gerenciar Animais
-const AdminAnimals = () => {
-    const { animals, animalActions, showMessage } = React.useContext(AppContext);
-    const [isFormOpen, setIsFormOpen] = useState(false);
-    const [editingAnimal, setEditingAnimal] = useState(null);
 
-    const handleEdit = (animal) => {
-        setEditingAnimal(animal);
-        setIsFormOpen(true);
-    };
-
-    const handleNew = () => {
-        setEditingAnimal(null);
-        setIsFormOpen(true);
-    };
-
-    const handleDelete = async (id) => {
-        // Substituímos o window.confirm por um modal de confirmação mais limpo, usando a função showMessage para feedback
-        if (window.confirm("Tem certeza que deseja DELETAR este animal?")) { 
-            await animalActions.delete(id);
-        }
-    };
-
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h3 className="text-2xl font-semibold text-gray-700">Lista de Animais Cadastrados ({animals.length})</h3>
-                <button onClick={handleNew}
-                    className="flex items-center space-x-1 px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition duration-150 shadow-md shadow-green-300"
-                >
-                    <LucidePlus className="w-5 h-5" />
-                    <span>Novo Animal</span>
-                </button>
-            </div>
-
-            {isFormOpen && (
-                <AnimalForm 
-                    animal={editingAnimal} 
-                    onClose={() => setIsFormOpen(false)}
-                    onSubmitSuccess={() => setIsFormOpen(false)}
-                />
-            )}
-
-            <div className="overflow-x-auto bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Idade</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {animals.map((animal) => (
-                            <tr key={animal.id} className="hover:bg-indigo-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{animal.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{animal.type}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{animal.age} anos</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shadow-sm ${animal.status === 'Disponível' ? 'bg-green-100 text-green-800' : animal.status === 'Adotado' ? 'bg-indigo-100 text-indigo-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                                        {animal.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                    <button onClick={() => handleEdit(animal)} className="text-indigo-600 hover:text-indigo-900 p-2 rounded-full hover:bg-indigo-200 transition" title="Editar"><LucideEdit className="w-5 h-5" /></button>
-                                    <button onClick={() => handleDelete(animal.id)} className="text-red-600 hover:text-red-900 p-2 rounded-full hover:bg-red-200 transition" title="Excluir"><LucideTrash2 className="w-5 h-5" /></button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+    <!-- MODAL GLOBAL (Notificações) -->
+    <div id="global-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform duration-300 border-t-4 border-rose-500 dark:border-rose-400">
+            <h3 id="modal-title" class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-3">Título</h3>
+            <p id="modal-message" class="text-gray-600 dark:text-gray-300 mb-6">Mensagem</p>
+            <div class="flex justify-end">
+                <button id="modal-close" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Fechar</button>
             </div>
         </div>
-    );
-};
+    </div>
 
-// Formulário de Criação/Edição de Animal
-const AnimalForm = ({ animal, onClose, onSubmitSuccess }) => {
-    const { animalActions } = React.useContext(AppContext);
-    const isEditing = !!animal;
-    const [form, setForm] = useState(animal ? {
-        ...animal,
-        // Concatena as fotos em uma string separada por nova linha para edição fácil
-        photosText: animal.photos.join('\n')
-    } : {
-        name: '',
-        type: 'Cão', // Default
-        breed: '',
-        age: 1,
-        gender: 'Macho', // Default
-        description: '',
-        status: 'Disponível',
-        photosText: '' // URLs das fotos separadas por linha
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    <!-- MODAL DE CONFIRMAÇÃO (Sim/Não) -->
+    <div id="confirm-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6 transform scale-100 transition-transform duration-300 border-t-4 border-sky-500 dark:border-sky-400">
+            <h3 id="confirm-modal-title" class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-3">Confirmar</h3>
+            <p id="confirm-modal-message" class="text-gray-600 dark:text-gray-300 mb-6">Tem certeza?</p>
+            <div class="flex justify-end space-x-3">
+                <button id="confirm-no" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded-lg transition-colors">Não</button>
+                <button id="confirm-yes" class="bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 px-4 rounded-lg transition-colors">Sim</button>
+            </div>
+        </div>
+    </div>
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setForm(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setIsSubmitting(true);
-        
-        // Converte a string de fotos para array antes de enviar
-        const photosArray = form.photosText.split('\n').map(s => s.trim()).filter(s => s);
-        const animalData = { ...form, photos: photosArray };
-        delete animalData.photosText;
-
-        try {
-            if (isEditing) {
-                await animalActions.update(animalData);
-            } else {
-                await animalActions.add(animalData);
-            }
-            onSubmitSuccess();
-        } catch (error) {
-            console.error("Erro ao salvar animal:", error);
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    return (
-        <div className="p-6 bg-indigo-50 border border-indigo-300 rounded-xl mb-6 shadow-lg">
-            <h4 className="text-xl font-bold text-indigo-700 mb-4">{isEditing ? 'Editar Animal: ' + animal.name : 'Adicionar Novo Animal'}</h4>
-            
-            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Linha 1 */}
-                <input type="text" name="name" placeholder="Nome do Animal *" required value={form.name} onChange={handleChange} className="col-span-1 md:col-span-2 px-3 py-2 border rounded-lg focus:ring-indigo-500" />
-                
-                {/* Linha 2 */}
-                <select name="type" required value={form.type} onChange={handleChange} className="px-3 py-2 border rounded-lg focus:ring-indigo-500">
-                    <option value="Cão">Cão</option>
-                    <option value="Gato">Gato</option>
-                    <option value="Outro">Outro</option>
-                </select>
-                <input type="text" name="breed" placeholder="Raça" value={form.breed} onChange={handleChange} className="px-3 py-2 border rounded-lg focus:ring-indigo-500" />
-
-                {/* Linha 3 */}
-                <input type="number" name="age" placeholder="Idade (Anos)" required value={form.age} onChange={handleChange} min="0" className="px-3 py-2 border rounded-lg focus:ring-indigo-500" />
-                <select name="gender" required value={form.gender} onChange={handleChange} className="px-3 py-2 border rounded-lg focus:ring-indigo-500">
-                    <option value="Macho">Macho</option>
-                    <option value="Fêmea">Fêmea</option>
-                </select>
-
-                {/* Linha 4 (Status) */}
-                <select name="status" required value={form.status} onChange={handleChange} className="col-span-1 md:col-span-2 px-3 py-2 border rounded-lg focus:ring-indigo-500">
-                    <option value="Disponível">Disponível</option>
-                    <option value="Em Processo">Em Processo</option>
-                    <option value="Adotado">Adotado</option>
-                </select>
-
-                {/* Linha 5 (Fotos - TextArea) */}
-                <textarea name="photosText" placeholder="Links das Fotos (um link por linha)" rows="3" value={form.photosText} onChange={handleChange} className="col-span-1 md:col-span-2 px-3 py-2 border rounded-lg focus:ring-indigo-500"></textarea>
-
-                {/* Linha 6 (Descrição) */}
-                <textarea name="description" placeholder="Descrição do animal e histórico (visível no site) *" required rows="3" value={form.description} onChange={handleChange} className="col-span-1 md:col-span-2 px-3 py-2 border rounded-lg focus:ring-indigo-500"></textarea>
-                
-                {/* Ações */}
-                <div className="col-span-1 md:col-span-2 flex justify-end space-x-3 mt-2">
-                    <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition duration-150 shadow-sm">
-                        Cancelar
-                    </button>
-                    <button type="submit" disabled={isSubmitting}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-indigo-300 transition duration-150 flex items-center space-x-2 shadow-md"
-                    >
-                        {isSubmitting ? 'A salvar...' : (isEditing ? 'Guardar Edição' : 'Adicionar Animal')}
+    <!-- MODAL DE FORMULÁRIO DE ANIMAL (CRUD) -->
+    <div id="animal-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300 overflow-y-auto">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg p-6 my-10 transform transition-transform duration-300 border-t-4 border-rose-500 dark:border-rose-400">
+            <div class="flex justify-between items-center mb-6">
+                <h3 id="animal-form-title" class="text-2xl font-bold text-rose-500 dark:text-rose-400">Adicionar Novo Animal</h3>
+                <button id="animal-modal-close" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            <form id="animal-form" class="space-y-4">
+                <div>
+                    <label for="nome" class="block text-sm font-medium mb-1">Nome</label>
+                    <input type="text" id="nome" name="nome" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label for="raca" class="block text-sm font-medium mb-1">Raça / Tipo</label>
+                        <input type="text" id="raca" name="raca" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                    </div>
+                    <div>
+                        <label for="idade" class="block text-sm font-medium mb-1">Idade (anos)</label>
+                        <input type="number" id="idade" name="idade" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required min="0">
+                    </div>
+                </div>
+                <div>
+                    <label for="sexo" class="block text-sm font-medium mb-1">Sexo</label>
+                    <select id="sexo" name="sexo" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                        <option value="Macho">Macho</option>
+                        <option value="Fêmea">Fêmea</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="imagemUrl" class="block text-sm font-medium mb-1">URL da Imagem</label>
+                    <input type="url" id="imagemUrl" name="imagemUrl" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                <div>
+                    <label for="descricao" class="block text-sm font-medium mb-1">Descrição</label>
+                    <textarea id="descricao" name="descricao" rows="4" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required></textarea>
+                </div>
+                <div class="pt-4">
+                    <button type="submit" class="w-full bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
+                        Salvar Animal no Firebase
                     </button>
                 </div>
             </form>
         </div>
-    );
-};
-
-
-// Subcomponente Admin: Interesses de Adoção
-const AdminInterests = () => {
-    const { interests, interestActions } = React.useContext(AppContext);
-
-    const handleUpdateStatus = async (id, status) => {
-        await interestActions.updateStatus(id, status);
-    };
-
-    const handleDeleteInterest = async (id) => {
-        if (window.confirm("Tem certeza que deseja MARCAR este interesse como TRATADO e arquivá-lo?")) {
-            await handleUpdateStatus(id, 'Tratado');
-        }
-    };
-
-    const getStatusClass = (status) => {
-        switch (status) {
-            case 'Pendente': return 'bg-yellow-100 text-yellow-800';
-            case 'Em Contato': return 'bg-blue-100 text-blue-800';
-            case 'Tratado': return 'bg-gray-100 text-gray-600';
-            default: return 'bg-gray-100 text-gray-500';
-        }
-    };
+    </div>
     
-    // Ordena os interesses para mostrar os Pendentes primeiro
-    const sortedInterests = interests.sort((a, b) => {
-        if (a.status === 'Pendente' && b.status !== 'Pendente') return -1;
-        if (a.status !== 'Pendente' && b.status === 'Pendente') return 1;
-        return new Date(b.date) - new Date(a.date); // Mais recentes primeiro
-    });
-
-    return (
-        <div className="space-y-6">
-            <h3 className="text-2xl font-semibold text-gray-700">Interesses Recebidos ({interests.filter(i => i.status !== 'Tratado').length} Pendentes)</h3>
-            
-            <div className="overflow-x-auto bg-gray-50 rounded-xl shadow-inner border border-gray-200">
-                <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
-                        <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Animal</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome do Interessado</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefone</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mensagem</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                        {sortedInterests.map((interest) => (
-                            <tr key={interest.id} className="hover:bg-blue-50">
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-700">{interest.animalNome}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{interest.nome}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{interest.telefone}</td>
-                                <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={interest.message}>{interest.message || 'N/A'}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shadow-sm ${getStatusClass(interest.status)}`}>
-                                        {interest.status}
-                                    </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                                    {interest.status !== 'Tratado' && (
-                                        <select 
-                                            value={interest.status} 
-                                            onChange={(e) => handleUpdateStatus(interest.id, e.target.value)}
-                                            className="p-1 border border-gray-300 rounded-lg text-sm bg-white shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                        >
-                                            <option value="Pendente">Pendente</option>
-                                            <option value="Em Contato">Em Contacto</option>
-                                            <option value="Tratado">Tratado</option>
-                                        </select>
-                                    )}
-                                    <button onClick={() => handleDeleteInterest(interest.id)} className="text-red-600 hover:text-red-900 p-2 rounded-full hover:bg-red-200 transition" title="Marcar como Tratado e Arquivar">
-                                        <LucideCheckCircle className="w-5 h-5" />
-                                    </button>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+    <!-- MODAL DE FORMULÁRIO DE INTERESSE EM ADOÇÃO -->
+    <div id="adoption-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4 transition-opacity duration-300 overflow-y-auto">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-sm p-6 my-10 transform transition-transform duration-300 border-t-4 border-sky-500 dark:border-sky-400">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-sky-500 dark:text-sky-400">Interesse em Adotar</h3>
+                <button id="adoption-modal-close" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
             </div>
+            <p class="mb-4 text-gray-600 dark:text-gray-300">Você está manifestando interesse em <span id="interest-animal-name" class="font-bold text-rose-500">...</span>. Preencha seus dados para contato:</p>
+            <form id="adoption-interest-form" class="space-y-4" data-animal-id="" data-animal-name="">
+                <div>
+                    <label for="interestName" class="block text-sm font-medium mb-1">Seu Nome Completo</label>
+                    <input type="text" id="interestName" name="interestName" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                </div>
+                <div>
+                    <label for="interestPhone" class="block text-sm font-medium mb-1">Telefone / WhatsApp</label>
+                    <input type="tel" id="interestPhone" name="interestPhone" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100" required>
+                </div>
+                <div>
+                    <label for="interestEmail" class="block text-sm font-medium mb-1">Email (Opcional)</label>
+                    <input type="email" id="interestEmail" name="interestEmail" class="w-full p-2 border border-gray-300 dark:border-gray-600 input-style bg-gray-50 dark:bg-gray-700 dark:text-gray-100">
+                </div>
+                <p id="adoption-interest-error" class="text-red-500 text-sm font-semibold h-5"></p>
+                <div class="pt-4">
+                    <button type="submit" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-3 rounded-lg transition-colors shadow-md">
+                        Registrar Interesse (Salvar no Firebase)
+                    </button>
+                </div>
+            </form>
         </div>
-    );
-};
+    </div>
+
+
+    <footer class="text-center py-6 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 mt-12">
+        © 2025 S.O.S Viralatas by Andrea. Todos os direitos reservados.
+    </footer>
+
+</body>
+</html>
