@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>S.O.S Viralatas by Andrea | Resgate e Adoção Premium (Versão Local)</title>
+    <title>S.O.S Viralatas by Andrea </title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
@@ -63,7 +63,7 @@
         // =======================================================
         // 🚨 CONFIGURAÇÃO LOCAL SIMPLIFICADA
         // =======================================================
-        const ADMIN_PASSWORD = '1234'; // Senha para acessar o painel
+        const ADMIN_PASSWORD = '13011998'; // Senha para acessar o painel
         
         const LOCAL_STORAGE_KEYS = {
             ANIMALS: 'sos_animals',
@@ -77,9 +77,9 @@
         let isAdminLoggedIn = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.ADMIN_LOGGED_IN)) || false;
         
         let appConfig = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.CONFIG)) || { 
-            email: 'contato@sosviralatas.org', 
-            telefone: '(XX) 9XXXX-XXXX', 
-            instagram: '@sosviralatas', 
+            email: 'novadeiaanimais@gmail.com', 
+            telefone: '(51)98238-7302', 
+            instagram: '@SosviralatasbyAndrea', 
             mapsLink: 'https://maps.app.goo.gl/exemplo' 
         }; 
         
@@ -88,7 +88,15 @@
             adotados_count: 0, 
             aguardando_adocao_count: 0, 
             site_views_count: 0, 
-            presentation_text: 'Bem-vindos ao S.O.S Viralatas by Andrea! Nossa missão é dar uma segunda chance a cães e gatos resgatados, encontrando lares amorosos para eles.' 
+            presentation_text: '🐾 Proposta de Colaboração para Resgate e Adoção de Animais
+Com o intuito de formalizar e solicitar apoio para uma iniciativa de grande relevância social e comunitária, apresento a seguir o escopo das minhas atividades:
+
+Ações na Comunidade: Atualmente, realizo o resgate, tratamento e provisão de alimentos para animais que se encontram em situação de vulnerabilidade em nossa localidade. Posteriormente, esses animais são encaminhados para o processo de adoção responsável.
+
+Foco da Assistência: A atenção é direcionada, sobretudo, a animais doentes, desnutridos e filhotes que demandam cuidados imediatos e especializados.🤝 Solicitação de Apoio
+Toda e qualquer forma de contribuição ou ajuda para sustentar e expandir esta causa é extremamente bem-vinda e valorizada. Seja por meio de recursos materiais, financeiros ou voluntariado, o seu auxílio fará uma diferença significativa na vida desses animais.
+
+Gostaria de saber se há interesse em discutir as modalidades de apoio ou se há alguma informação adicional que eu possa fornecer sobre o trabalho realizado..' 
         }; 
         
         let animalsList = JSON.parse(localStorage.getItem(LOCAL_STORAGE_KEYS.ANIMALS)) || []; 
